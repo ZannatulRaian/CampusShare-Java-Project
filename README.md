@@ -54,6 +54,30 @@ Featured top announcement with full-text popup.
 
 ---
 
+---
+
+## 📸 Screenshots
+
+### 🔐 Login
+![Login](docs/screenshots/login.png)
+
+### 🏠 Dashboard
+![Dashboard](docs/screenshots/dashboard.png)
+
+### 💬 Chat System
+![Chat](docs/screenshots/chat.png)
+
+### 📅 Events
+![Events](docs/screenshots/event.png)
+
+### 📢 Announcement
+![Events](docs/screenshots/announcement.png)
+
+### 🧺 Resource
+![Events](docs/screenshots/resource.png)
+
+---
+
 ## 🏗 Architecture
 
 Dual-Database System (SQLite-first, Supabase-second)
