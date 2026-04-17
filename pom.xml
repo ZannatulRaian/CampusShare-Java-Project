@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.campusshare</groupId>
+  <artifactId>campusshare</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+
+  <!-- FIXED LINE -->
+  <name>CampusShare</name>
+
+  <properties>
+    <maven.compiler.release>17</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+    <!--
+      ╔══════════════════════════════════════════════════════════╗
+      ║  SUPABASE CREDENTIALS — only the Admin fills these in   ║
+      ║  These get baked INTO the JAR at build time.            ║
+      ║  Teammates receive the pre-built JAR — they never see   ║
+      ║  or need to know these values.                          ║
+      ║                                                          ║
+      ║  HOW TO SET:                                             ║
+      ║    Option A (recommended): create build.properties in   ║
+      ║    the project root (same folder as pom.xml) and add:   ║
+      ║      supabase.url=https://xxxx.supabase.co              ║
+      ║      supabase.anon_key=eyJhbGci...                      ║
+      ║    That file is in .gitignore — never committed.        ║
+      ║                                                          ║
+      ║    Option B: edit the lines below directly,             ║
+      ║    then do NOT commit pom.xml.                          ║
+      ╚══════════════════════════════════════════════════════════╝
+    -->
+
+    <supabase.url></supabase.url>
+    <supabase.anon_key></supabase.anon_key>
+
+  </properties>
+
+  <!-- Load build.properties if it exists (overrides empty values above) -->
+  <profiles>
+    <profile>
+      <id>with-credentials</id>
+      <activation>
+        <file>
+          <exists>${basedir}/build.properties</exists>
+        </file>
+      </activation>
+      <build>
+        <filters>
+          <filter>${basedir}/build.properties</filter>
+        </filters>
+      </build>
+    </profile>
+  </profiles>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.formdev</groupId>
+      <artifactId>flatlaf</artifactId>
+      <version>3.4</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.xerial</groupId>
+      <artifactId>sqlite-jdbc</artifactId>
+      <version>3.36.0.3</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.mindrot</groupId>
+      <artifactId>jbcrypt</artifactId>
+      <version>0.4</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.squareup.okhttp3</groupId>
+      <artifactId>okhttp</artifactId>
+      <version>4.12.0</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.json</groupId>
+      <artifactId>json</artifactId>
+      <version>20240303</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-nop</artifactId>
+      <version>2.0.13</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <finalName>CampusShare</finalName>
+
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>true</filtering>
+      </resource>
+    </resources>
+
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.5.2</version>
+
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+
+            <configuration>
+              <createDependencyReducedPom>false</createDependencyReducedPom>
+
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>com.campusshare.CampusShareApp</mainClass>
+                </transformer>
+
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+              </transformers>
+
+            </configuration>
+          </execution>
+        </executions>
+
+      </plugin>
+    </plugins>
+  </build>
+
+</project>
