@@ -1,208 +1,164 @@
-# 🎓 CampusShare
+# CampusShare — Java Swing Desktop App
 
-CampusShare is a Java Swing desktop application designed for university campuses.  
-It provides a unified platform for students, faculty, and administrators to share academic resources, post announcements, manage events, and communicate — with full offline support and automatic cloud synchronization via Supabase.
-
-Built with Java 17 + SQLite + Supabase (PostgreSQL).
-
----
-
-## 🚀 Key Features
-
-### 🏠 Dashboard
-- Bento-grid layout
-- Clickable stat blocks
-- Recent notes, events, announcements
-- Detail popups for every item
-
-### 📚 Notes & Resources
-- Upload any file type (PDF, Word, PPT, Excel, images, etc.)
-- Local storage: ~/CampusShare/files/
-- Optional cloud storage via Supabase Storage
-- Faculty approval system
-
-### 📅 Events
-- Faculty can create events
-- Title, date, time, category, location
-- Clickable detail view
-
-### 📢 Announcements
-Tags:
-- GENERAL
-- URGENT
-- ACADEMIC
-- FACILITY
-- EXAM
-- EVENT
-
-Featured top announcement with full-text popup.
-
-### 💬 Chat System
-- Channel chats (#general, #cse, #eee, #announcements)
-- Direct messages
-- Messenger-style UI
-- Right/Left bubble layout
-- Delete message option
-- Online status indicator
-- Auto-refresh every 5 seconds
-
-### 👤 Profile
-- Edit name, department, semester
-- Upload circular avatar
-- Change password
-- Admin-only cloud connection settings
+A campus resource-sharing platform built in Java Swing with:
+- **Offline mode** (SQLite, zero config)
+- **Online mode** (Supabase cloud, optional)
 
 ---
 
----
+## Prerequisites
 
-## 📸 Screenshots
+| Tool | Version | Download |
+|------|---------|----------|
+| JDK  | 17 or 21 LTS | https://adoptium.net |
+| Maven | 3.8+ | https://maven.apache.org/download.cgi |
 
-### 🔐 Login
-![Login](docs/screenshots/login.png)
-
-### 🏠 Dashboard
-![Dashboard](docs/screenshots/dashboard.png)
-
-### 💬 Chat System
-![Chat](docs/screenshots/chat.png)
-
-### 📅 Events
-![Events](docs/screenshots/event.png)
-
-### 📢 Announcement
-![Events](docs/screenshots/announcement.png)
-
-### 🧺 Resource
-![Events](docs/screenshots/resource.png)
+After installing, verify:
+```
+java -version
+mvn -version
+```
 
 ---
 
-## 🏗 Architecture
+## Offline Mode (SQLite) — Default, no config needed
 
-Dual-Database System (SQLite-first, Supabase-second)
+### Build
+```bash
+cd CampusShareFinal
+mvn clean package
+```
+Maven downloads all dependencies on first build (~30 MB, internet required once).
 
-WRITE:
-1. Save to local SQLite
-2. If online → write to Supabase
-3. Translate local ID → cloud ID
-4. Upload files to Supabase Storage
+### Run
+```bash
+java -jar target\CampusShare.jar       # Windows
+java -jar target/CampusShare.jar       # Mac/Linux
+```
 
-READ:
-- Online → Supabase
-- Offline → SQLite
-- Cached in memory via DataStore
+On first launch the app creates `~/CampusShare/campusshare.db` with demo data.
 
----
+### Demo accounts (all passwords: `pass123`)
 
-## 🗄 Database Schema (v13)
+| Email | Role |
+|-------|------|
+| grace@campus.edu | Student |
+| admin@campus.edu | Admin |
+| bob@campus.edu   | Student |
+| mary@campus.edu  | Faculty |
 
-Tables:
-- users
-- subjects
-- resources
-- events
-- announcements
-- messages (channel + dm unified)
-
----
-
-## 🛠 Tech Stack
-
-- Java 17
-- Java Swing + FlatLaf
-- SQLite (JDBC)
-- Supabase (PostgreSQL)
-- Maven
-- OkHttp
-- BCrypt
+### Reset the database
+Delete `~/CampusShare/campusshare.db` and relaunch — fresh seed data is created.
 
 ---
 
-## 📦 Build & Run
+## Online Mode (Supabase Cloud)
 
-Requirements:
-- Java JDK 17+
-- Maven 3.6+
+### Step 1 — Create a Supabase project
+1. Go to https://supabase.com → New Project
+2. Choose a region, set a database password, wait for provisioning
 
-Check:
+### Step 2 — Run the schema SQL
+In Supabase Dashboard → SQL Editor, paste and run:
 
-    java -version
-    mvn -version
+```sql
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY, full_name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE, password TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'STUDENT',
+  department TEXT NOT NULL DEFAULT 'CSE', semester INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS subjects (
+  id SERIAL PRIMARY KEY, name TEXT NOT NULL, code TEXT NOT NULL, department TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS resources (
+  id SERIAL PRIMARY KEY, subject_id INTEGER REFERENCES subjects(id),
+  uploader_id INTEGER REFERENCES users(id), file_name TEXT NOT NULL,
+  file_type TEXT NOT NULL DEFAULT 'PDF', file_size TEXT NOT NULL DEFAULT '—',
+  file_path TEXT NOT NULL DEFAULT '', approved BOOLEAN NOT NULL DEFAULT false,
+  rating REAL NOT NULL DEFAULT 0, uploaded_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS events (
+  id SERIAL PRIMARY KEY, title TEXT NOT NULL, date TEXT NOT NULL,
+  time TEXT NOT NULL DEFAULT '00:00', category TEXT NOT NULL DEFAULT 'SEMINAR',
+  location TEXT NOT NULL DEFAULT 'TBA', organizer_id INTEGER REFERENCES users(id)
+);
+CREATE TABLE IF NOT EXISTS announcements (
+  id SERIAL PRIMARY KEY, title TEXT NOT NULL, body TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'GENERAL', author_id INTEGER REFERENCES users(id),
+  posted_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS messages (
+  id SERIAL PRIMARY KEY, channel TEXT NOT NULL,
+  sender_id INTEGER REFERENCES users(id), body TEXT NOT NULL,
+  sent_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
 
-Clean old local data (important):
+### Step 3 — Add your credentials
+Open `src/main/java/com/campusshare/remote/SupabaseConfig.java` and fill in:
 
-Windows:
-    C:\Users\YourName\CampusShare\
+```java
+public static final String SUPABASE_URL      = "https://YOUR-PROJECT-ID.supabase.co";
+public static final String SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
+```
 
-Mac/Linux:
-    ~/CampusShare/
+Find these in: Supabase Dashboard → Settings → API
 
-Build:
+### Step 4 — Rebuild and run
+```bash
+mvn clean package
+java -jar target/CampusShare.jar
+```
 
-    mvn clean package
-
-Run:
-
-    java -jar target/CampusShare.jar
-
----
-
-## 🔐 Demo Accounts
-
-Admin:
-    admin@campus.edu / admin123
-
-Faculty:
-    smith@campus.edu / faculty123
-
-Students:
-    alice@campus.edu / student123
-    bob@campus.edu / student123
-
----
-
-## ☁ Supabase Setup (Admin)
-
-1. Create new project at supabase.com
-2. Run supabase_schema.sql in SQL Editor
-3. Disable Email Confirmation:
-   Authentication → Providers → Email → Confirm email OFF
-4. Create storage buckets:
-   - notes (Public)
-   - avatars (Public)
-5. Copy:
-   - Project URL
-   - anon public key
-6. Login as Admin → Profile → Cloud Connection → Save & Connect
-
----
-
-## ⚠ Known Limitations
-
-- Chat uses polling (5s), not realtime websockets
-- Offline uploads sync when online
-- Local and Supabase passwords can diverge
-- Demo users auto-register on first online login
+The app now authenticates via Supabase and falls back to SQLite if offline.
 
 ---
 
-## 🧪 Troubleshooting
+## Project Structure
 
-Always Offline?
-- Ensure credentials entered
-- URL must start with https://
-- anon key begins with eyJhbGci
+```
+CampusShareFinal/
+├── pom.xml
+└── src/main/java/com/campusshare/
+    ├── CampusShareApp.java              ← Entry point
+    ├── data/
+    │   └── DataStore.java               ← All model classes + DAO-backed lists
+    ├── db/
+    │   ├── Database.java                ← SQLite connection + schema creation
+    │   ├── DAO.java                     ← All DB operations (dual-mode)
+    │   └── SeedData.java                ← Demo data seeded on first launch
+    ├── remote/
+    │   ├── SupabaseConfig.java          ← ★ EDIT THIS for cloud mode
+    │   ├── SupabaseClient.java          ← Supabase REST API calls
+    │   └── RealtimeClient.java          ← Realtime stub
+    ├── chat/
+    │   ├── ChatServer.java
+    │   ├── ChatClient.java
+    │   └── LocalBroadcast.java          ← In-process message events
+    └── ui/
+        ├── LoginWindow.java             ← Space-themed animated login
+        ├── MainWindow.java              ← Sidebar + panel switcher
+        ├── Theme.java                   ← Colors, fonts, buttons
+        ├── RoundBorder.java
+        └── panels/
+            ├── DashboardPanel.java      ← Stats + recent activity
+            ├── NotesPanel.java          ← Browse/upload/approve notes
+            ├── EventsPanel.java         ← Events grid, admin add/delete
+            ├── AnnouncementsPanel.java  ← Post/delete announcements
+            ├── ForumPanel.java          ← Persisted chat by channel
+            └── ProfilePanel.java        ← Edit profile + change password
+```
 
-SQL errors?
-Delete:
-    ~/CampusShare/
-and relaunch.
+## Role capabilities
 
-Unable to access jarfile?
-Run:
-    java -jar target/CampusShare.jar
-
----
-
-EOF
+| Feature | Student | Faculty | Admin |
+|---------|---------|---------|-------|
+| View notes | ✅ (approved only) | ✅ (all) | ✅ (all) |
+| Upload notes | ✅ (pending approval) | ✅ (auto-approved) | ✅ |
+| Approve notes | ❌ | ❌ | ✅ |
+| View events | ✅ | ✅ | ✅ |
+| Add/delete events | ❌ | ❌ | ✅ |
+| Post announcements | ❌ | ❌ | ✅ |
+| Chat | ✅ | ✅ | ✅ |
+| Edit own profile | ✅ | ✅ | ✅ |

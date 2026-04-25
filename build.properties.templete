@@ -1,0 +1,17 @@
+# ============================================================
+#  CampusShare — Admin Build Credentials Template
+#  
+#  INSTRUCTIONS:
+#  1. Copy this file and rename it to:  build.properties
+#     (in the same folder as pom.xml)
+#  2. Fill in your Supabase URL and anon key below
+#  3. Run: mvn clean package
+#  4. Share target/CampusShare.jar with teammates
+#     They run it — credentials are baked in, nothing to set up
+#
+#  IMPORTANT: build.properties is in .gitignore
+#  Never commit it. Never share it. Only share the JAR.
+# ============================================================
+
+supabase.url=https://YOUR_PROJECT_ID.supabase.co
+supabase.anon_key=eyJhbGci...YOUR_ANON_KEY_HERE
