@@ -72,15 +72,18 @@ public class DataStore {
         public boolean isFaculty() { return "FACULTY".equalsIgnoreCase(role) || isAdmin(); }
 
         public String initials() {
-            String[] p = fullName.trim().split(" ");
-            return p.length == 1
-                ? p[0].substring(0, 1).toUpperCase()
-                : (p[0].substring(0, 1) + p[p.length - 1].substring(0, 1)).toUpperCase();
+            if (fullName == null || fullName.trim().isEmpty()) return "?";
+            String[] p = fullName.trim().split("\\s+");
+            String first = (p[0].length() > 0) ? p[0].substring(0, 1).toUpperCase() : "?";
+            if (p.length == 1) return first;
+            String last = (p[p.length - 1].length() > 0) ? p[p.length - 1].substring(0, 1).toUpperCase() : "";
+            return first + last;
         }
 
         public String firstName() {
-            String[] p = fullName.trim().split(" ");
-            return p.length > 0 ? p[0] : fullName;
+            if (fullName == null || fullName.trim().isEmpty()) return "User";
+            String[] p = fullName.trim().split("\\s+");
+            return p.length > 0 && !p[0].isEmpty() ? p[0] : fullName;
         }
 
         @Override public String toString() { return fullName; }

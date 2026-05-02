@@ -154,7 +154,8 @@ public class SyncManager {
                 if (created != null) pushed++;
                 else System.err.println("[Sync] Failed to push note: " + fname);
             } catch (Exception e) {
-                System.err.println("[Sync] Error pushing note " + fname + ": " + e.getMessage());
+                System.err.println("[Sync] Error pushing note " + fname + ": "
+                    + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
             }
         }
         return pushed;
@@ -192,7 +193,8 @@ public class SyncManager {
                 if (created != null) pushed++;
                 else System.err.println("[Sync] Failed to push event: " + title);
             } catch (Exception e) {
-                System.err.println("[Sync] Error pushing event " + title + ": " + e.getMessage());
+                System.err.println("[Sync] Error pushing event " + title + ": "
+                    + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
             }
         }
         return pushed;
@@ -226,7 +228,8 @@ public class SyncManager {
                 if (created != null) pushed++;
                 else System.err.println("[Sync] Failed to push announcement: " + title);
             } catch (Exception e) {
-                System.err.println("[Sync] Error pushing announcement " + title + ": " + e.getMessage());
+                System.err.println("[Sync] Error pushing announcement " + title + ": "
+                    + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
             }
         }
         return pushed;

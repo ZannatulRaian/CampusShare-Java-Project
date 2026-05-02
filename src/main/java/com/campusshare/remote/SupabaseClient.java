@@ -206,7 +206,6 @@ public class SupabaseClient {
     /** Upload bytes to Supabase Storage. Returns public URL or null. */
     /** Ensures the storage bucket exists (creates it if not). Call once on login. */
     public static void ensureBucketExists(String bucket) {
-        // Try to create the bucket — if it already exists, Supabase returns an error which we ignore
         try {
             org.json.JSONObject body = new org.json.JSONObject()
                 .put("id", bucket)
@@ -220,8 +219,15 @@ public class SupabaseClient {
                 .post(RequestBody.create(body.toString(), JSON_TYPE))
                 .build();
             try (Response r = HTTP.newCall(req).execute()) {
-                // 200 = created, 409 = already exists — both are fine
-                System.out.println("[Storage] Bucket '" + bucket + "': " + r.code());
+                int code = r.code();
+                if (code == 200 || code == 201) {
+                    System.out.println("[Storage] Bucket '" + bucket + "': created OK");
+                } else if (code == 400 || code == 409) {
+                    // 400/409 = bucket already exists — this is normal, not an error
+                    System.out.println("[Storage] Bucket '" + bucket + "': already exists (OK)");
+                } else {
+                    System.err.println("[Storage] Bucket '" + bucket + "': unexpected HTTP " + code);
+                }
             }
         } catch (Exception e) { System.err.println("[Storage] Bucket check: " + e.getMessage()); }
     }

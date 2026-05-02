@@ -752,9 +752,15 @@ public class DAO {
     // ══════════════════════════════════════════════════════════════════════════
 
     private static DataStore.User mapUserFromJson(JSONObject o) {
+        String fullName = o.optString("full_name", "").trim();
+        if (fullName.isEmpty()) {
+            // Fall back to email prefix if name is missing
+            String email = o.optString("email", "");
+            fullName = email.contains("@") ? email.substring(0, email.indexOf('@')) : "Unknown User";
+        }
         return new DataStore.User(
             o.optInt("user_id", o.optInt("id", 0)),
-            o.optString("full_name"),
+            fullName,
             o.optString("email"),
             o.optString("role", "STUDENT"),
             o.optString("department", ""),
@@ -938,7 +944,13 @@ public class DAO {
     // ══════════════════════════════════════════════════════════════════════════
 
     private static DataStore.User mapUserFromRs(ResultSet rs) throws SQLException {
-        DataStore.User u = new DataStore.User(rs.getInt("user_id"), rs.getString("full_name"),
+        String fullName = rs.getString("full_name");
+        if (fullName == null || fullName.trim().isEmpty()) {
+            String email = rs.getString("email");
+            fullName = (email != null && email.contains("@"))
+                ? email.substring(0, email.indexOf('@')) : "Unknown User";
+        }
+        DataStore.User u = new DataStore.User(rs.getInt("user_id"), fullName,
             rs.getString("email"), rs.getString("role"),
             rs.getString("department"), rs.getInt("semester"));
         try { u.avatarPath = rs.getString("avatar_path"); } catch (SQLException ignored) {}

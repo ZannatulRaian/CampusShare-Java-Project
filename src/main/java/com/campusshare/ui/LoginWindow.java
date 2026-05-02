@@ -57,11 +57,7 @@ public class LoginWindow extends JFrame {
         JPanel leftPanel = new JPanel(new BorderLayout());
         leftPanel.setOpaque(false);
 
-        // Logo top-left
-        JPanel logoArea = new JPanel(new FlowLayout(FlowLayout.LEFT, 24, 20));
-        logoArea.setOpaque(false);
-        logoArea.add(buildLogoWidget());
-        leftPanel.add(logoArea, BorderLayout.NORTH);
+        // No logo on login/signup screen
 
         // Hero text bottom-left
         JPanel heroArea = new JPanel();
