@@ -87,13 +87,13 @@ public class ProfilePanel extends JPanel {
         avatarPanel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         avatarPanel.setToolTipText("Click to change profile photo");
         avatarPanel.addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent e) { changePhoto(); }
+            public void mousePressed(MouseEvent e) { changePhoto(); }
         });
         banner.add(avatarPanel);
 
         // Name label in banner
         JLabel nameInBanner = new JLabel(user.fullName);
-        nameInBanner.setFont(new Font("SansSerif", Font.BOLD, 15));
+        nameInBanner.setFont(new Font("SansSerif", Font.BOLD, 18));
         nameInBanner.setForeground(Color.WHITE);
         nameInBanner.setBounds(AVATAR_SIZE + 36, 30, 260, 22);
         banner.add(nameInBanner);
@@ -320,7 +320,7 @@ public class ProfilePanel extends JPanel {
         JPanel header = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 12));
         header.setOpaque(false);
         JLabel icon = new JLabel("☁");
-        icon.setFont(Theme.font(Font.PLAIN, 22));
+        icon.setFont(Theme.font(Font.PLAIN, 26));
         JPanel ht = new JPanel(new GridLayout(2, 1, 0, 2)); ht.setOpaque(false);
         JLabel h1 = new JLabel("Cloud Connection — Admin Only");
         h1.setFont(Theme.FONT_H2); h1.setForeground(Theme.TEXT_DARK);

@@ -35,9 +35,9 @@ public class AnnouncementsPanel extends JPanel {
 
         JPanel left = new JPanel(); left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS)); left.setOpaque(false);
         JLabel title = new JLabel("Announcements");
-        title.setFont(new Font("SansSerif", Font.BOLD, 22)); title.setForeground(Theme.TEXT_DARK);
+        title.setFont(new Font("SansSerif", Font.BOLD, 26)); title.setForeground(Theme.TEXT_DARK);
         JLabel sub = new JLabel(DataStore.ANNOUNCEMENTS.size() + " announcements posted");
-        sub.setFont(Theme.font(Font.PLAIN, 12)); sub.setForeground(Theme.TEXT_MUTE);
+        sub.setFont(Theme.font(Font.PLAIN, 15)); sub.setForeground(Theme.TEXT_MUTE);
         left.add(title); left.add(Box.createVerticalStrut(2)); left.add(sub);
         header.add(left, BorderLayout.WEST);
 
@@ -52,7 +52,7 @@ public class AnnouncementsPanel extends JPanel {
         if (DataStore.ANNOUNCEMENTS.isEmpty()) {
             JPanel empty = new JPanel(new BorderLayout()); empty.setOpaque(false);
             JLabel lbl = new JLabel("No announcements yet");
-            lbl.setFont(Theme.font(Font.PLAIN, 14)); lbl.setForeground(Theme.TEXT_FAINT);
+            lbl.setFont(Theme.font(Font.PLAIN, 17)); lbl.setForeground(Theme.TEXT_FAINT);
             lbl.setHorizontalAlignment(SwingConstants.CENTER);
             empty.add(lbl, BorderLayout.CENTER);
             add(empty, BorderLayout.CENTER);
@@ -104,7 +104,7 @@ public class AnnouncementsPanel extends JPanel {
         card.setBorder(BorderFactory.createEmptyBorder(24, 28, 20, 28));
         card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         card.addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent e) { showDetail(a, tagColor); }
+            public void mousePressed(MouseEvent e) { showDetail(a, tagColor); }
         });
 
         JPanel topRow = new JPanel(new BorderLayout()); topRow.setOpaque(false);
@@ -166,7 +166,7 @@ public class AnnouncementsPanel extends JPanel {
         card.setBorder(BorderFactory.createEmptyBorder(14, 22, 14, 18));
         card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         card.addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent e) { showDetail(a, tagColor); }
+            public void mousePressed(MouseEvent e) { showDetail(a, tagColor); }
             public void mouseEntered(MouseEvent e) { card.repaint(); }
             public void mouseExited(MouseEvent e)  { card.repaint(); }
         });
@@ -188,7 +188,7 @@ public class AnnouncementsPanel extends JPanel {
         card.add(topRow, BorderLayout.NORTH);
 
         JLabel titleLbl = new JLabel(a.title);
-        titleLbl.setFont(Theme.font(Font.BOLD, 13)); titleLbl.setForeground(Theme.TEXT_DARK);
+        titleLbl.setFont(Theme.font(Font.BOLD, 16)); titleLbl.setForeground(Theme.TEXT_DARK);
         card.add(titleLbl, BorderLayout.CENTER);
 
         JPanel bottom = new JPanel(new BorderLayout(10, 0)); bottom.setOpaque(false);
@@ -223,7 +223,7 @@ public class AnnouncementsPanel extends JPanel {
         JLabel tagLbl = Theme.chip("  " + a.tag.toUpperCase() + "  ", Color.WHITE,
             new Color(255,255,255,50));
         JLabel titleLbl = new JLabel(a.title);
-        titleLbl.setFont(new Font("SansSerif", Font.BOLD, 17));
+        titleLbl.setFont(new Font("SansSerif", Font.BOLD, 20));
         titleLbl.setForeground(Color.WHITE);
         JPanel bandTop = new JPanel(new BorderLayout()); bandTop.setOpaque(false);
         bandTop.add(tagLbl, BorderLayout.WEST);
@@ -238,7 +238,7 @@ public class AnnouncementsPanel extends JPanel {
         JTextArea body = new JTextArea(a.body);
         body.setEditable(false); body.setLineWrap(true); body.setWrapStyleWord(true);
         body.setBackground(Theme.BG_CARD); body.setForeground(Theme.TEXT_DARK);
-        body.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        body.setFont(new Font("SansSerif", Font.PLAIN, 17));
         body.setBorder(BorderFactory.createEmptyBorder(20, 24, 20, 24));
         body.setCaretColor(Theme.BG_CARD);
         JScrollPane sp = new JScrollPane(body);
@@ -282,7 +282,7 @@ public class AnnouncementsPanel extends JPanel {
         header.setBackground(new Color(0x1A1836));
         header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.BORDER));
         JLabel head = new JLabel("Post an Announcement");
-        head.setFont(new Font("SansSerif", Font.BOLD, 16)); head.setForeground(Theme.TEXT_DARK);
+        head.setFont(new Font("SansSerif", Font.BOLD, 19)); head.setForeground(Theme.TEXT_DARK);
         header.add(head);
         root.add(header, BorderLayout.NORTH);
 
@@ -322,7 +322,7 @@ public class AnnouncementsPanel extends JPanel {
         String[] tags = {"GENERAL","URGENT","ACADEMIC","FACILITY","EXAM","EVENT"};
         JComboBox<String> tagBox = new JComboBox<>(tags);
         tagBox.setBackground(Theme.BG_INPUT); tagBox.setForeground(Theme.TEXT_DARK);
-        tagBox.setFont(Theme.font(Font.PLAIN, 13));
+        tagBox.setFont(Theme.font(Font.PLAIN, 16));
         gc.gridy = 5; gc.insets = new Insets(0, 0, 0, 0);
         form.add(tagBox, gc);
 

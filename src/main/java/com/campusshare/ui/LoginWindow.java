@@ -66,17 +66,17 @@ public class LoginWindow extends JFrame {
         heroArea.setBorder(BorderFactory.createEmptyBorder(0, 28, 48, 20));
 
         JLabel tagline = new JLabel("SIGN IN TO YOUR");
-        tagline.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        tagline.setFont(new Font("SansSerif", Font.PLAIN, 15));
         tagline.setForeground(new Color(255, 255, 255, 160));
         tagline.setAlignmentX(LEFT_ALIGNMENT);
 
         JLabel headline = new JLabel("<html>CAMPUS<br>ADVENTURE!</html>");
-        headline.setFont(new Font("SansSerif", Font.BOLD, 34));
+        headline.setFont(new Font("SansSerif", Font.BOLD, 38));
         headline.setForeground(Color.WHITE);
         headline.setAlignmentX(LEFT_ALIGNMENT);
 
         JLabel caption = new JLabel("Your campus, connected.");
-        caption.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        caption.setFont(new Font("SansSerif", Font.PLAIN, 15));
         caption.setForeground(new Color(255, 255, 255, 100));
         caption.setAlignmentX(LEFT_ALIGNMENT);
 
@@ -130,11 +130,11 @@ public class LoginWindow extends JFrame {
                 g2.setStroke(new BasicStroke(1.5f));
                 g2.drawPolygon(xs,ys,6);
                 g2.setColor(Color.WHITE);
-                Font bf = new Font("SansSerif",Font.BOLD,13);
+                Font bf = new Font("SansSerif",Font.BOLD,16);
                 g2.setFont(bf);
                 FontMetrics fm=g2.getFontMetrics();
                 g2.drawString("C",cx-fm.stringWidth("C")/2,cy+fm.getAscent()/2-1);
-                g2.setFont(new Font("SansSerif",Font.BOLD,15));
+                g2.setFont(new Font("SansSerif",Font.BOLD,18));
                 fm = g2.getFontMetrics();
                 g2.setColor(Color.WHITE); g2.drawString("Campus",38,22);
                 int cw = fm.stringWidth("Campus");
@@ -203,13 +203,13 @@ public class LoginWindow extends JFrame {
 
         // Title
         JLabel title = new JLabel("Welcome Back");
-        title.setFont(new Font("SansSerif",Font.BOLD,22)); title.setForeground(Color.WHITE);
+        title.setFont(new Font("SansSerif",Font.BOLD,26)); title.setForeground(Color.WHITE);
         title.setHorizontalAlignment(SwingConstants.CENTER);
         gc.gridy=0; gc.insets=new Insets(28,28,4,28);
         card.add(title, gc);
 
         JLabel sub = new JLabel("Sign in to CampusShare");
-        sub.setFont(Theme.font(Font.PLAIN,12)); sub.setForeground(new Color(255,255,255,140));
+        sub.setFont(Theme.font(Font.PLAIN,15)); sub.setForeground(new Color(255,255,255,140));
         sub.setHorizontalAlignment(SwingConstants.CENTER);
         gc.gridy=1; gc.insets=new Insets(0,28,20,28);
         card.add(sub, gc);
@@ -232,7 +232,7 @@ public class LoginWindow extends JFrame {
 
         // Error label
         errorLabel = new JLabel(" ");
-        errorLabel.setFont(Theme.font(Font.PLAIN,11));
+        errorLabel.setFont(Theme.font(Font.PLAIN,14));
         errorLabel.setForeground(new Color(252,165,165));
         errorLabel.setHorizontalAlignment(SwingConstants.CENTER);
         gc.gridy=6; gc.insets=new Insets(0,28,6,28);
@@ -249,12 +249,12 @@ public class LoginWindow extends JFrame {
         JPanel toggle = new JPanel(new FlowLayout(FlowLayout.CENTER,4,0));
         toggle.setOpaque(false);
         JLabel noAcct = new JLabel("Don't have an account?");
-        noAcct.setFont(Theme.font(Font.PLAIN,11)); noAcct.setForeground(new Color(255,255,255,140));
+        noAcct.setFont(Theme.font(Font.PLAIN,14)); noAcct.setForeground(new Color(255,255,255,140));
         JLabel signUpLink = new JLabel("Sign Up");
-        signUpLink.setFont(Theme.font(Font.BOLD,11)); signUpLink.setForeground(new Color(0xA78BFA));
+        signUpLink.setFont(Theme.font(Font.BOLD,14)); signUpLink.setForeground(new Color(0xA78BFA));
         signUpLink.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         signUpLink.addMouseListener(new MouseAdapter(){
-            public void mouseClicked(MouseEvent e){ switchToSignUp(); }
+            public void mousePressed(MouseEvent e){ switchToSignUp(); }
         });
         toggle.add(noAcct); toggle.add(signUpLink);
         gc.gridy=8; gc.insets=new Insets(0,28,24,28);
@@ -284,12 +284,12 @@ public class LoginWindow extends JFrame {
         gc.gridx=0; gc.fill=GridBagConstraints.HORIZONTAL; gc.weightx=1;
 
         JLabel title = new JLabel("Create Account");
-        title.setFont(new Font("SansSerif",Font.BOLD,22)); title.setForeground(Color.WHITE);
+        title.setFont(new Font("SansSerif",Font.BOLD,26)); title.setForeground(Color.WHITE);
         title.setHorizontalAlignment(SwingConstants.CENTER);
         gc.gridy=0; gc.insets=new Insets(28,28,4,28); card.add(title,gc);
 
         JLabel sub = new JLabel("Join CampusShare today");
-        sub.setFont(Theme.font(Font.PLAIN,12)); sub.setForeground(new Color(255,255,255,140));
+        sub.setFont(Theme.font(Font.PLAIN,15)); sub.setForeground(new Color(255,255,255,140));
         sub.setHorizontalAlignment(SwingConstants.CENTER);
         gc.gridy=1; gc.insets=new Insets(0,28,18,28); card.add(sub,gc);
 
@@ -315,7 +315,7 @@ public class LoginWindow extends JFrame {
         gc.gridy=9; gc.insets=new Insets(0,28,8,28); card.add(passField,gc);
 
         errorLabel = new JLabel(" ");
-        errorLabel.setFont(Theme.font(Font.PLAIN,11));
+        errorLabel.setFont(Theme.font(Font.PLAIN,14));
         errorLabel.setForeground(new Color(252,165,165));
         errorLabel.setHorizontalAlignment(SwingConstants.CENTER);
         gc.gridy=10; gc.insets=new Insets(0,28,6,28); card.add(errorLabel,gc);
@@ -327,12 +327,12 @@ public class LoginWindow extends JFrame {
         JPanel toggle = new JPanel(new FlowLayout(FlowLayout.CENTER,4,0));
         toggle.setOpaque(false);
         JLabel has = new JLabel("Already have an account?");
-        has.setFont(Theme.font(Font.PLAIN,11)); has.setForeground(new Color(255,255,255,140));
+        has.setFont(Theme.font(Font.PLAIN,14)); has.setForeground(new Color(255,255,255,140));
         JLabel signInLink = new JLabel("Sign In");
-        signInLink.setFont(Theme.font(Font.BOLD,11)); signInLink.setForeground(new Color(0xA78BFA));
+        signInLink.setFont(Theme.font(Font.BOLD,14)); signInLink.setForeground(new Color(0xA78BFA));
         signInLink.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         signInLink.addMouseListener(new MouseAdapter(){
-            public void mouseClicked(MouseEvent e){ switchToLogin(); }
+            public void mousePressed(MouseEvent e){ switchToLogin(); }
         });
         toggle.add(has); toggle.add(signInLink);
         gc.gridy=12; gc.insets=new Insets(0,28,22,28); card.add(toggle,gc);
@@ -343,7 +343,7 @@ public class LoginWindow extends JFrame {
     // \u2500\u2500 Field helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
     private JLabel makeFieldLabel(String text) {
         JLabel l = new JLabel(text);
-        l.setFont(Theme.font(Font.BOLD,11));
+        l.setFont(Theme.font(Font.BOLD,14));
         l.setForeground(new Color(255,255,255,180));
         return l;
     }
@@ -399,14 +399,14 @@ public class LoginWindow extends JFrame {
             new RoundBorder(8,new Color(140,100,255,80),1),
             BorderFactory.createEmptyBorder(8,12,8,12)));
         f.setForeground(Color.WHITE); f.setCaretColor(Color.WHITE);
-        f.setFont(Theme.font(Font.PLAIN,13));
+        f.setFont(Theme.font(Font.PLAIN,16));
         f.setPreferredSize(new Dimension(0,38));
     }
 
     private void styleCombo(JComboBox<String> c) {
         c.setBackground(new Color(30,20,80));
         c.setForeground(Color.WHITE);
-        c.setFont(Theme.font(Font.PLAIN,13));
+        c.setFont(Theme.font(Font.PLAIN,16));
         c.setBorder(new RoundBorder(8,new Color(140,100,255,80),1));
         c.setPreferredSize(new Dimension(0,38));
     }
@@ -418,7 +418,7 @@ public class LoginWindow extends JFrame {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
                 Color bg = getModel().isRollover() ? new Color(0x4F46E5) : new Color(0x6366F1);
                 g2.setColor(bg); g2.fillRoundRect(0,0,getWidth(),getHeight(),10,10);
-                g2.setColor(Color.WHITE); g2.setFont(Theme.font(Font.BOLD,13));
+                g2.setColor(Color.WHITE); g2.setFont(Theme.font(Font.BOLD,16));
                 FontMetrics fm=g2.getFontMetrics();
                 g2.drawString(getText(),(getWidth()-fm.stringWidth(getText()))/2,(getHeight()+fm.getAscent()-fm.getDescent())/2);
                 g2.dispose();

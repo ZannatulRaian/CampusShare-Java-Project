@@ -151,7 +151,7 @@ public class MainWindow extends JFrame {
                     g2.setPaint(new GradientPaint(0,0,new Color(0x6366F1),32,32,new Color(0x7C3AED)));
                     g2.fillRoundRect(0,0,32,32,8,8);
                     g2.setColor(Color.WHITE);
-                    g2.setFont(new Font("SansSerif",Font.BOLD,13));
+                    g2.setFont(new Font("SansSerif",Font.BOLD,16));
                     g2.drawString("CS", 5, 22);
                 }
                 g2.dispose();
@@ -161,7 +161,7 @@ public class MainWindow extends JFrame {
         logoIcon.setMinimumSize(new Dimension(32,32)); logoIcon.setMaximumSize(new Dimension(32,32));
 
         JLabel logoText = new JLabel("CampusShare");
-        logoText.setFont(new Font("SansSerif", Font.BOLD, 14));
+        logoText.setFont(new Font("SansSerif", Font.BOLD, 17));
         logoText.setForeground(Color.WHITE);
         logoText.setName("logoText");
         logoText.setVisible(false); // hidden when collapsed
@@ -209,7 +209,7 @@ public class MainWindow extends JFrame {
         logoutRow.setAlignmentX(LEFT_ALIGNMENT);
         JPanel logoutIcon = makeIconButton("\u21A4", new Color(252,165,165), this::doLogout);
         JLabel logoutText = new JLabel("Log Out");
-        logoutText.setFont(Theme.font(Font.PLAIN, 12));
+        logoutText.setFont(Theme.font(Font.PLAIN, 15));
         logoutText.setForeground(new Color(252,165,165));
         logoutText.setName("logoutText");
         logoutText.setVisible(false);
@@ -217,7 +217,7 @@ public class MainWindow extends JFrame {
         logoutRow.add(logoutText);
         logoutRow.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         logoutRow.addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent e) { doLogout(); }
+            public void mousePressed(MouseEvent e) { doLogout(); }
         });
         bottom.add(logoutRow);
         sb.add(bottom, BorderLayout.SOUTH);
@@ -249,7 +249,7 @@ public class MainWindow extends JFrame {
         JPanel nameCol = new JPanel(); nameCol.setLayout(new BoxLayout(nameCol, BoxLayout.Y_AXIS)); nameCol.setOpaque(false);
         nameCol.setName("userNameCol");
         String dn = user.fullName.length() > 14 ? user.fullName.substring(0,14)+"…" : user.fullName;
-        JLabel nameL = new JLabel(dn); nameL.setFont(Theme.font(Font.BOLD,12)); nameL.setForeground(Color.WHITE);
+        JLabel nameL = new JLabel(dn); nameL.setFont(Theme.font(Font.BOLD,15)); nameL.setForeground(Color.WHITE);
         JLabel roleL = new JLabel(user.role.toLowerCase()); roleL.setFont(Theme.FONT_TINY);
         roleL.setForeground(user.isFaculty() ? new Color(0x6EE7B7) : new Color(0xA5B4FC));
         nameCol.add(nameL); nameCol.add(roleL);
@@ -270,7 +270,7 @@ public class MainWindow extends JFrame {
                     g2.fillRoundRect(0,0,getWidth(),getHeight(),8,8);
                 }
                 g2.setColor(fg);
-                g2.setFont(new Font("SansSerif", Font.PLAIN, 14));
+                g2.setFont(new Font("SansSerif", Font.PLAIN, 17));
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString(symbol, (getWidth()-fm.stringWidth(symbol))/2, (getHeight()+fm.getAscent()-fm.getDescent())/2);
                 g2.dispose();
@@ -280,7 +280,7 @@ public class MainWindow extends JFrame {
         btn.setPreferredSize(new Dimension(36,32));
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         btn.addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent e) { action.run(); }
+            public void mousePressed(MouseEvent e) { action.run(); }
             public void mouseEntered(MouseEvent e) { btn.repaint(); }
             public void mouseExited(MouseEvent e)  { btn.repaint(); }
         });
@@ -384,7 +384,7 @@ public class MainWindow extends JFrame {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(active ? new Color(accent.getRed(),accent.getGreen(),accent.getBlue(),38) : new Color(255,255,255,8));
                 g2.fillRoundRect(0,0,getWidth(),getHeight(),7,7);
-                g2.setFont(Theme.font(Font.PLAIN, 13));
+                g2.setFont(Theme.font(Font.PLAIN, 16));
                 g2.setColor(active ? accent : new Color(255,255,255,130));
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString(icon,(getWidth()-fm.stringWidth(icon))/2,(getHeight()+fm.getAscent()-fm.getDescent())/2);
@@ -394,18 +394,25 @@ public class MainWindow extends JFrame {
         iconBox.setOpaque(false); iconBox.setPreferredSize(new Dimension(28,26)); iconBox.setMinimumSize(new Dimension(28,26)); iconBox.setMaximumSize(new Dimension(28,26));
 
         JLabel text = new JLabel(label);
-        text.setFont(Theme.font(Font.PLAIN, 13));
+        text.setFont(Theme.font(Font.PLAIN, 16));
         text.setForeground(key.equals(activeNav) ? Color.WHITE : new Color(255,255,255,145));
         text.setVisible(false); // hidden until expanded
 
         p.add(iconBox); p.add(text);
         navPanels.put(key, p);
 
-        p.addMouseListener(new MouseAdapter() {
+        MouseAdapter navClick = new MouseAdapter() {
             public void mouseEntered(MouseEvent e) { p.repaint(); }
             public void mouseExited(MouseEvent e)  { p.repaint(); }
-            public void mouseClicked(MouseEvent e) { switchNav(key); }
-        });
+            public void mousePressed(MouseEvent e) { switchNav(key); }
+        };
+        p.addMouseListener(navClick);
+        // Forward clicks from child components (icon box, label) to the parent nav item
+        for (Component child : p.getComponents()) {
+            child.addMouseListener(new MouseAdapter() {
+                public void mousePressed(MouseEvent e) { switchNav(key); }
+            });
+        }
         return p;
     }
 
@@ -438,11 +445,11 @@ public class MainWindow extends JFrame {
         searchWrap.setBorder(new RoundBorder(8,Theme.BORDER,1));
         searchWrap.setPreferredSize(new Dimension(260,34));
         JLabel sIcon = new JLabel("  \uD83D\uDD0D ");
-        sIcon.setFont(Theme.font(Font.PLAIN,11)); sIcon.setForeground(Theme.TEXT_MUTE);
+        sIcon.setFont(Theme.font(Font.PLAIN,14)); sIcon.setForeground(Theme.TEXT_MUTE);
         JTextField search = new JTextField();
         search.setOpaque(false);
         search.setBorder(BorderFactory.createEmptyBorder(0,0,0,8));
-        search.setFont(Theme.font(Font.PLAIN,13)); search.setForeground(Theme.TEXT_DARK);
+        search.setFont(Theme.font(Font.PLAIN,16)); search.setForeground(Theme.TEXT_DARK);
         search.setCaretColor(Theme.PRIMARY);
         searchWrap.add(sIcon, BorderLayout.WEST); searchWrap.add(search, BorderLayout.CENTER);
         bar.add(searchWrap, BorderLayout.WEST);
@@ -475,7 +482,7 @@ public class MainWindow extends JFrame {
 
         JPanel avT=buildAvatarPanel(user,26);
         avT.setPreferredSize(new Dimension(26,26)); avT.setMinimumSize(new Dimension(26,26)); avT.setMaximumSize(new Dimension(26,26));
-        JLabel nL=new JLabel(dn); nL.setFont(Theme.font(Font.BOLD,12)); nL.setForeground(Theme.TEXT_DARK);
+        JLabel nL=new JLabel(dn); nL.setFont(Theme.font(Font.BOLD,15)); nL.setForeground(Theme.TEXT_DARK);
         JLabel rL=new JLabel(user.role.toLowerCase()); rL.setFont(Theme.FONT_TINY); rL.setForeground(Theme.TEXT_MUTE);
         JPanel nc=new JPanel(); nc.setLayout(new BoxLayout(nc,BoxLayout.Y_AXIS)); nc.setOpaque(false);
         nc.add(nL); nc.add(rL);
@@ -500,7 +507,7 @@ public class MainWindow extends JFrame {
     private JLabel buildConnectionBadge() {
         boolean online=ConnectionMonitor.isOnline();
         JLabel badge=new JLabel(online?"● Online":"● Offline");
-        badge.setFont(Theme.font(Font.BOLD,10));
+        badge.setFont(Theme.font(Font.BOLD,13));
         badge.setForeground(online?Theme.SUCCESS:Theme.TEXT_FAINT);
         badge.setBorder(BorderFactory.createCompoundBorder(
             new RoundBorder(10,online?new Color(Theme.SUCCESS.getRed(),Theme.SUCCESS.getGreen(),Theme.SUCCESS.getBlue(),60):Theme.BORDER,1),

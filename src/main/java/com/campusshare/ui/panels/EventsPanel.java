@@ -35,9 +35,9 @@ public class EventsPanel extends JPanel {
 
         JPanel left = new JPanel(); left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS)); left.setOpaque(false);
         JLabel title = new JLabel("Campus Events");
-        title.setFont(new Font("SansSerif", Font.BOLD, 22)); title.setForeground(Theme.TEXT_DARK);
+        title.setFont(new Font("SansSerif", Font.BOLD, 26)); title.setForeground(Theme.TEXT_DARK);
         JLabel sub = new JLabel(DataStore.EVENTS.size() + " events scheduled");
-        sub.setFont(Theme.font(Font.PLAIN, 12)); sub.setForeground(Theme.TEXT_MUTE);
+        sub.setFont(Theme.font(Font.PLAIN, 15)); sub.setForeground(Theme.TEXT_MUTE);
         left.add(title); left.add(Box.createVerticalStrut(2)); left.add(sub);
         header.add(left, BorderLayout.WEST);
 
@@ -51,7 +51,7 @@ public class EventsPanel extends JPanel {
         if (DataStore.EVENTS.isEmpty()) {
             JPanel empty = new JPanel(new BorderLayout()); empty.setOpaque(false);
             JLabel lbl = new JLabel("No events yet");
-            lbl.setFont(Theme.font(Font.PLAIN, 14)); lbl.setForeground(Theme.TEXT_FAINT);
+            lbl.setFont(Theme.font(Font.PLAIN, 17)); lbl.setForeground(Theme.TEXT_FAINT);
             lbl.setHorizontalAlignment(SwingConstants.CENTER);
             empty.add(lbl, BorderLayout.CENTER);
             add(empty, BorderLayout.CENTER);
@@ -89,7 +89,7 @@ public class EventsPanel extends JPanel {
         card.setOpaque(false);
         card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         card.addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent e) { showDetail(ev, accent); }
+            public void mousePressed(MouseEvent e) { showDetail(ev, accent); }
         });
 
         // ── Top color band ────────────────────────────────────────────────────
@@ -121,7 +121,7 @@ public class EventsPanel extends JPanel {
 
         // Category chip
         JLabel cat = new JLabel(ev.category.toUpperCase());
-        cat.setFont(Theme.font(Font.BOLD, 9));
+        cat.setFont(Theme.font(Font.BOLD, 12));
         cat.setForeground(Color.WHITE);
         cat.setOpaque(false);
         cat.setBounds(72, 12, 120, 16);
@@ -141,7 +141,7 @@ public class EventsPanel extends JPanel {
         body.setBorder(BorderFactory.createEmptyBorder(12, 14, 12, 14));
 
         JLabel titleLbl = new JLabel(ev.title);
-        titleLbl.setFont(Theme.font(Font.BOLD, 14));
+        titleLbl.setFont(Theme.font(Font.BOLD, 17));
         titleLbl.setForeground(Theme.TEXT_DARK);   // light on dark
         body.add(titleLbl, BorderLayout.NORTH);
 
@@ -192,7 +192,7 @@ public class EventsPanel extends JPanel {
         JLabel catChip = Theme.chip(" " + ev.category.toUpperCase() + " ", Color.WHITE,
             new Color(255,255,255,50));
         JLabel titleLbl = new JLabel(ev.title);
-        titleLbl.setFont(new Font("SansSerif", Font.BOLD, 18)); titleLbl.setForeground(Color.WHITE);
+        titleLbl.setFont(new Font("SansSerif", Font.BOLD, 21)); titleLbl.setForeground(Color.WHITE);
         band.add(catChip, BorderLayout.NORTH); band.add(titleLbl, BorderLayout.SOUTH);
         root.add(band, BorderLayout.NORTH);
 
@@ -223,10 +223,10 @@ public class EventsPanel extends JPanel {
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
         row.setBorder(BorderFactory.createEmptyBorder(0,0,8,0));
         JLabel lbl = new JLabel(label);
-        lbl.setFont(Theme.font(Font.BOLD, 12)); lbl.setForeground(Theme.TEXT_MUTE);
+        lbl.setFont(Theme.font(Font.BOLD, 15)); lbl.setForeground(Theme.TEXT_MUTE);
         lbl.setPreferredSize(new Dimension(100, 24));
         JLabel val = new JLabel(value);
-        val.setFont(Theme.font(Font.PLAIN, 13)); val.setForeground(Theme.TEXT_DARK);
+        val.setFont(Theme.font(Font.PLAIN, 16)); val.setForeground(Theme.TEXT_DARK);
         row.add(lbl, BorderLayout.WEST); row.add(val, BorderLayout.CENTER);
         row.setAlignmentX(LEFT_ALIGNMENT);
         p.add(row);
@@ -256,7 +256,7 @@ public class EventsPanel extends JPanel {
         header.setBackground(new Color(0x1A1836));
         header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.BORDER));
         JLabel head = new JLabel("New Campus Event");
-        head.setFont(new Font("SansSerif", Font.BOLD, 16)); head.setForeground(Theme.TEXT_DARK);
+        head.setFont(new Font("SansSerif", Font.BOLD, 19)); head.setForeground(Theme.TEXT_DARK);
         header.add(head);
         root.add(header, BorderLayout.NORTH);
 
@@ -275,7 +275,7 @@ public class EventsPanel extends JPanel {
         String[] cats = {"Seminar","Workshop","Cultural","Sports","Academic","Health","Other"};
         JComboBox<String> catBox = new JComboBox<>(cats);
         catBox.setBackground(Theme.BG_INPUT); catBox.setForeground(Theme.TEXT_DARK);
-        catBox.setFont(Theme.font(Font.PLAIN, 13));
+        catBox.setFont(Theme.font(Font.PLAIN, 16));
 
         String[] labels = {"Title","Date","Time","Category","Location"};
         JComponent[] comps = {titleF, dateF, timeF, catBox, locF};

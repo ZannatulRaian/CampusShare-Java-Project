@@ -77,14 +77,14 @@ public class ForumPanel extends JPanel {
         searchWrap.setAlignmentX(LEFT_ALIGNMENT);
 
         JLabel searchIcon = new JLabel("🔍");
-        searchIcon.setFont(Theme.font(Font.PLAIN, 11));
+        searchIcon.setFont(Theme.font(Font.PLAIN, 14));
         searchIcon.setForeground(Theme.TEXT_MUTE);
 
         userSearchField = new JTextField();
         userSearchField.setBackground(Theme.BG_INPUT);
         userSearchField.setForeground(Theme.TEXT_DARK);
         userSearchField.setCaretColor(Theme.PRIMARY);
-        userSearchField.setFont(Theme.font(Font.PLAIN, 12));
+        userSearchField.setFont(Theme.font(Font.PLAIN, 15));
         userSearchField.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createLineBorder(Theme.BORDER),
             BorderFactory.createEmptyBorder(5, 8, 5, 8)));
@@ -208,7 +208,7 @@ public class ForumPanel extends JPanel {
 
             // Click to open DM
             cell.addMouseListener(new MouseAdapter() {
-                public void mouseClicked(MouseEvent e) {
+                public void mousePressed(MouseEvent e) {
                     if (u.id == user.id) return; // can't DM yourself
                     isDM = true; dmTarget = u; currentChannel = "dm_" + u.id;
                     rebuildAll();
@@ -272,7 +272,7 @@ public class ForumPanel extends JPanel {
         lbl.setForeground(active ? Theme.PRIMARY : Theme.TEXT_MUTE);
         btn.add(lbl);
         btn.addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent e) {
+            public void mousePressed(MouseEvent e) {
                 currentChannel = ch; isDM = false; dmTarget = null; rebuildAll();
             }
         });
@@ -300,7 +300,7 @@ public class ForumPanel extends JPanel {
         JPanel namePanel = new JPanel(); namePanel.setOpaque(false);
         namePanel.setLayout(new BoxLayout(namePanel, BoxLayout.Y_AXIS));
         JLabel nameL = new JLabel(u.firstName());
-        nameL.setFont(Theme.font(Font.BOLD, 11));
+        nameL.setFont(Theme.font(Font.BOLD, 14));
         nameL.setForeground(active ? Theme.PRIMARY : Theme.TEXT_DARK);
         JLabel roleL = new JLabel(u.role.toLowerCase());
         roleL.setFont(Theme.FONT_TINY); roleL.setForeground(Theme.TEXT_FAINT);
@@ -322,7 +322,7 @@ public class ForumPanel extends JPanel {
         btn.add(dotP, BorderLayout.EAST);
 
         btn.addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent e) {
+            public void mousePressed(MouseEvent e) {
                 isDM = true; dmTarget = u; currentChannel = "dm_" + u.id; rebuildAll();
             }
         });
@@ -355,7 +355,7 @@ public class ForumPanel extends JPanel {
         JPanel badge = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
         badge.setOpaque(false);
         JLabel dotLbl = new JLabel("●");
-        dotLbl.setFont(Theme.font(Font.PLAIN, 9)); dotLbl.setForeground(Theme.SUCCESS);
+        dotLbl.setFont(Theme.font(Font.PLAIN, 12)); dotLbl.setForeground(Theme.SUCCESS);
         long onlineCnt = allUsers.stream().filter(DataStore.User::isOnline).count();
         JLabel cntLbl = new JLabel(onlineCnt + " online");
         cntLbl.setFont(Theme.FONT_TINY); cntLbl.setForeground(Theme.TEXT_MUTE);
@@ -365,7 +365,7 @@ public class ForumPanel extends JPanel {
         rightBar.setOpaque(false);
         rightBar.add(badge);
         JButton menuBtn = new JButton("⋮");
-        menuBtn.setFont(Theme.font(Font.BOLD, 16));
+        menuBtn.setFont(Theme.font(Font.BOLD, 19));
         menuBtn.setForeground(Theme.TEXT_MUTE);
         menuBtn.setBackground(Theme.BG_CARD);
         menuBtn.setBorder(BorderFactory.createEmptyBorder(2, 10, 2, 6));
@@ -451,7 +451,7 @@ public class ForumPanel extends JPanel {
         }
         if (msgs.isEmpty()) {
             JLabel empty = new JLabel("No messages yet. Say hello! 👋");
-            empty.setFont(Theme.font(Font.PLAIN, 13));
+            empty.setFont(Theme.font(Font.PLAIN, 16));
             empty.setForeground(Theme.TEXT_FAINT);
             empty.setAlignmentX(CENTER_ALIGNMENT);
             messagesPanel.add(Box.createVerticalGlue());

@@ -53,10 +53,10 @@ public class NotesPanel extends JPanel {
 
         JPanel left = new JPanel(); left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS)); left.setOpaque(false);
         JLabel title = new JLabel("Notes & Resources");
-        title.setFont(new Font("SansSerif", Font.BOLD, 22)); title.setForeground(Theme.TEXT_DARK);
+        title.setFont(new Font("SansSerif", Font.BOLD, 26)); title.setForeground(Theme.TEXT_DARK);
         long total = DataStore.NOTES.stream().filter(n -> n.approved || user.isFaculty()).count();
         JLabel sub = new JLabel(total + " documents available");
-        sub.setFont(Theme.font(Font.PLAIN, 12)); sub.setForeground(Theme.TEXT_MUTE);
+        sub.setFont(Theme.font(Font.PLAIN, 15)); sub.setForeground(Theme.TEXT_MUTE);
         left.add(title); left.add(Box.createVerticalStrut(2)); left.add(sub);
 
         JPanel controls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
@@ -74,7 +74,7 @@ public class NotesPanel extends JPanel {
         for (int i = 0; i < DataStore.SUBJECTS.size(); i++) subs[i+1] = DataStore.SUBJECTS.get(i).name;
         subjectFilter = new JComboBox<>(subs);
         subjectFilter.setBackground(Theme.BG_INPUT); subjectFilter.setForeground(Theme.TEXT_DARK);
-        subjectFilter.setFont(Theme.font(Font.PLAIN, 12));
+        subjectFilter.setFont(Theme.font(Font.PLAIN, 15));
         subjectFilter.setPreferredSize(new Dimension(160, 34));
         subjectFilter.addActionListener(e -> populateGrid());
 
@@ -103,7 +103,7 @@ public class NotesPanel extends JPanel {
         if (filtered.isEmpty()) {
             cardGrid.setLayout(new BorderLayout());
             JLabel empty = new JLabel("No notes found");
-            empty.setFont(Theme.font(Font.PLAIN, 14)); empty.setForeground(Theme.TEXT_FAINT);
+            empty.setFont(Theme.font(Font.PLAIN, 17)); empty.setForeground(Theme.TEXT_FAINT);
             empty.setHorizontalAlignment(SwingConstants.CENTER);
             cardGrid.add(empty, BorderLayout.CENTER);
         } else {
@@ -140,7 +140,7 @@ public class NotesPanel extends JPanel {
                 g2.setColor(tc);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight() + 16, 16, 16);
                 g2.setColor(new Color(255,255,255,25));
-                g2.setFont(new Font("SansSerif", Font.BOLD, 48));
+                g2.setFont(new Font("SansSerif", Font.BOLD, 52));
                 g2.drawString(n.fileType.substring(0, Math.min(3, n.fileType.length())), 12, 60);
                 g2.dispose();
             }
@@ -150,7 +150,7 @@ public class NotesPanel extends JPanel {
 
         if (!n.approved) {
             JLabel pending = new JLabel("PENDING");
-            pending.setFont(Theme.font(Font.BOLD, 9));
+            pending.setFont(Theme.font(Font.BOLD, 12));
             pending.setForeground(Color.WHITE);
             pending.setBackground(new Color(0xD97706));
             pending.setOpaque(true);
@@ -167,7 +167,7 @@ public class NotesPanel extends JPanel {
 
         String fname = n.fileName.length() > 28 ? n.fileName.substring(0, 28) + "…" : n.fileName;
         JLabel nameLbl = new JLabel(fname);
-        nameLbl.setFont(Theme.font(Font.BOLD, 12));
+        nameLbl.setFont(Theme.font(Font.BOLD, 15));
         nameLbl.setForeground(Theme.TEXT_DARK);   // light text on dark card
 
         JLabel subjLbl = new JLabel(n.subjectName());
@@ -200,7 +200,7 @@ public class NotesPanel extends JPanel {
                     g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                     g2.setColor(getModel().isRollover() ? new Color(0x047857) : Theme.SUCCESS);
                     g2.fillRoundRect(0,0,getWidth(),getHeight(),7,7);
-                    g2.setColor(Color.WHITE); g2.setFont(Theme.font(Font.BOLD, 10));
+                    g2.setColor(Color.WHITE); g2.setFont(Theme.font(Font.BOLD, 13));
                     FontMetrics fm = g2.getFontMetrics();
                     g2.drawString(getText(),(getWidth()-fm.stringWidth(getText()))/2,(getHeight()+fm.getAscent()-fm.getDescent())/2);
                     g2.dispose();
@@ -243,7 +243,7 @@ public class NotesPanel extends JPanel {
         gc.fill = GridBagConstraints.HORIZONTAL; gc.insets = new Insets(6,0,6,0); gc.weightx = 1.0;
 
         JLabel titleLbl = new JLabel("Upload a Note");
-        titleLbl.setFont(new Font("SansSerif", Font.BOLD, 18));
+        titleLbl.setFont(new Font("SansSerif", Font.BOLD, 21));
         titleLbl.setForeground(Theme.TEXT_DARK);
         gc.gridx = 0; gc.gridy = 0; p.add(titleLbl, gc);
 
@@ -255,7 +255,7 @@ public class NotesPanel extends JPanel {
         JComboBox<String> subjectBox = new JComboBox<>(subs);
         subjectBox.setEditable(true);  // ← Allow typing new subjects
         subjectBox.setBackground(Theme.BG_INPUT); subjectBox.setForeground(Theme.TEXT_DARK);
-        subjectBox.setFont(Theme.font(Font.PLAIN, 13));
+        subjectBox.setFont(Theme.font(Font.PLAIN, 16));
         gc.gridy = 1; p.add(subLbl, gc);
         gc.gridy = 2; p.add(subjectBox, gc);
 
@@ -265,7 +265,7 @@ public class NotesPanel extends JPanel {
 
         File[] chosen = {null};
         JLabel fileLabel = new JLabel("No file chosen");
-        fileLabel.setFont(Theme.font(Font.PLAIN, 12)); fileLabel.setForeground(Theme.TEXT_MUTE);
+        fileLabel.setFont(Theme.font(Font.PLAIN, 15)); fileLabel.setForeground(Theme.TEXT_MUTE);
 
         JButton chooseBtn = Theme.ghostButton("Choose File", Theme.PRIMARY);
         chooseBtn.setPreferredSize(new Dimension(120, 34));
