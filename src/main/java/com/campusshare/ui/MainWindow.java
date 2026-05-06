@@ -1,13 +1,45 @@
 package com.campusshare.ui;
 
+import java.awt.BorderLayout;
+import java.awt.CardLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Container;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.GradientPaint;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Insets;
+import java.awt.Point;
+import java.awt.RenderingHints;
+import java.awt.Toolkit;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JWindow;
+import javax.swing.SwingUtilities;
+
 import com.campusshare.data.DataStore;
-import com.campusshare.ui.panels.*;
-import javax.swing.*;
 import com.campusshare.remote.ConnectionMonitor;
-import javax.swing.border.*;
-import java.awt.*;
-import java.awt.event.*;
-import java.util.*;
+import com.campusshare.ui.panels.AnnouncementsPanel;
+import com.campusshare.ui.panels.DashboardPanel;
+import com.campusshare.ui.panels.EventsPanel;
+import com.campusshare.ui.panels.ForumPanel;
+import com.campusshare.ui.panels.NotesPanel;
+import com.campusshare.ui.panels.ProfilePanel;
 
 /**
  * Main application window — Claude-style slim sidebar + content area.
@@ -66,6 +98,10 @@ public class MainWindow extends JFrame {
         cardLayout  = new CardLayout();
         contentArea = new JPanel(cardLayout);
         contentArea.setBackground(Theme.BG_APP);
+
+        // Start notification service BEFORE building UI so the badge listener
+        // registered inside buildBellButton() receives updates from the live poller
+        com.campusshare.ui.NotificationService.get().start(user.id, this);
 
         setContentPane(buildRootPanel(user));
         setVisible(true);
@@ -157,11 +193,11 @@ public class MainWindow extends JFrame {
                 g2.dispose();
             }
         };
-        logoIcon.setOpaque(false); logoIcon.setPreferredSize(new Dimension(32,32));
+        logoIcon.setOpaque(false); logoIcon.setPreferredSize(new Dimension(40,40));
         logoIcon.setMinimumSize(new Dimension(32,32)); logoIcon.setMaximumSize(new Dimension(32,32));
 
         JLabel logoText = new JLabel("CampusShare");
-        logoText.setFont(new Font("SansSerif", Font.BOLD, 17));
+        logoText.setFont(new Font("SansSerif", Font.BOLD, 34));
         logoText.setForeground(Color.WHITE);
         logoText.setName("logoText");
         logoText.setVisible(false); // hidden when collapsed
@@ -203,23 +239,43 @@ public class MainWindow extends JFrame {
         bottom.add(makeSidebarDivider());
         bottom.add(Box.createVerticalStrut(2));
 
-        // Logout row
-        JPanel logoutRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 11, 4));
-        logoutRow.setOpaque(false);
-        logoutRow.setAlignmentX(LEFT_ALIGNMENT);
-        JPanel logoutIcon = makeIconButton("\u21A4", new Color(252,165,165), this::doLogout);
-        JLabel logoutText = new JLabel("Log Out");
-        logoutText.setFont(Theme.font(Font.PLAIN, 15));
-        logoutText.setForeground(new Color(252,165,165));
-        logoutText.setName("logoutText");
-        logoutText.setVisible(false);
-        logoutRow.add(logoutIcon);
-        logoutRow.add(logoutText);
-        logoutRow.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        logoutRow.addMouseListener(new MouseAdapter() {
-            public void mousePressed(MouseEvent e) { doLogout(); }
-        });
-        bottom.add(logoutRow);
+        // Logout — use a real JButton so click events don't bubble through parent panels
+        JButton logoutBtn = new JButton() {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                Color pinkRed = new Color(252, 165, 165);
+                if (getModel().isRollover()) {
+                    g2.setColor(new Color(252, 165, 165, 20));
+                    g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
+                }
+                // Always draw the arrow icon centered in the first 36px (icon column)
+                g2.setColor(pinkRed);
+                g2.setFont(new Font("SansSerif", Font.PLAIN, 20));
+                FontMetrics fm = g2.getFontMetrics();
+                String arrow = "\u21A4";
+                g2.drawString(arrow, (36 - fm.stringWidth(arrow)) / 2, (getHeight() + fm.getAscent() - fm.getDescent()) / 2);
+                // Draw "Log Out" text only when button is wide enough (sidebar expanded)
+                if (getWidth() > 60) {
+                    g2.setFont(new Font("SansSerif", Font.PLAIN, 17));
+                    fm = g2.getFontMetrics();
+                    g2.drawString("Log Out", 44, (getHeight() + fm.getAscent() - fm.getDescent()) / 2);
+                }
+                g2.dispose();
+            }
+        };
+        logoutBtn.setName("logoutText");
+        logoutBtn.setOpaque(false);
+        logoutBtn.setContentAreaFilled(false);
+        logoutBtn.setBorderPainted(false);
+        logoutBtn.setFocusPainted(false);
+        logoutBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        logoutBtn.setPreferredSize(new Dimension(SIDEBAR_COLLAPSED, 36));
+        logoutBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
+        logoutBtn.setAlignmentX(LEFT_ALIGNMENT);
+        // Single ActionListener — fires exactly once per click, no bubbling
+        logoutBtn.addActionListener(e -> doLogout());
+        bottom.add(logoutBtn);
         sb.add(bottom, BorderLayout.SOUTH);
 
         // Hover expand/collapse
@@ -244,7 +300,7 @@ public class MainWindow extends JFrame {
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 42));
 
         JPanel av = buildAvatarPanel(user, 28);
-        av.setPreferredSize(new Dimension(28,28)); av.setMinimumSize(new Dimension(28,28)); av.setMaximumSize(new Dimension(28,28));
+        av.setPreferredSize(new Dimension(36,36)); av.setMinimumSize(new Dimension(36,36)); av.setMaximumSize(new Dimension(36,36));
 
         JPanel nameCol = new JPanel(); nameCol.setLayout(new BoxLayout(nameCol, BoxLayout.Y_AXIS)); nameCol.setOpaque(false);
         nameCol.setName("userNameCol");
@@ -270,7 +326,7 @@ public class MainWindow extends JFrame {
                     g2.fillRoundRect(0,0,getWidth(),getHeight(),8,8);
                 }
                 g2.setColor(fg);
-                g2.setFont(new Font("SansSerif", Font.PLAIN, 17));
+                g2.setFont(new Font("SansSerif", Font.PLAIN, 34));
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString(symbol, (getWidth()-fm.stringWidth(symbol))/2, (getHeight()+fm.getAscent()-fm.getDescent())/2);
                 g2.dispose();
@@ -317,7 +373,7 @@ public class MainWindow extends JFrame {
         }
         // logo text, logout text, user name col
         setNamedVisible(sb, "logoText", visible);
-        setNamedVisible(sb, "logoutText", visible);
+        // logoutBtn self-draws text based on its own width — no need to toggle visibility
         setNamedVisible(sb, "userNameCol", visible);
     }
 
@@ -384,17 +440,17 @@ public class MainWindow extends JFrame {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(active ? new Color(accent.getRed(),accent.getGreen(),accent.getBlue(),38) : new Color(255,255,255,8));
                 g2.fillRoundRect(0,0,getWidth(),getHeight(),7,7);
-                g2.setFont(Theme.font(Font.PLAIN, 16));
+                g2.setFont(Theme.font(Font.PLAIN, 19));
                 g2.setColor(active ? accent : new Color(255,255,255,130));
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString(icon,(getWidth()-fm.stringWidth(icon))/2,(getHeight()+fm.getAscent()-fm.getDescent())/2);
                 g2.dispose();
             }
         };
-        iconBox.setOpaque(false); iconBox.setPreferredSize(new Dimension(28,26)); iconBox.setMinimumSize(new Dimension(28,26)); iconBox.setMaximumSize(new Dimension(28,26));
+        iconBox.setOpaque(false); iconBox.setPreferredSize(new Dimension(34,32)); iconBox.setMinimumSize(new Dimension(34,32)); iconBox.setMaximumSize(new Dimension(34,32));
 
         JLabel text = new JLabel(label);
-        text.setFont(Theme.font(Font.PLAIN, 16));
+        text.setFont(Theme.font(Font.PLAIN, 19));
         text.setForeground(key.equals(activeNav) ? Color.WHITE : new Color(255,255,255,145));
         text.setVisible(false); // hidden until expanded
 
@@ -422,7 +478,7 @@ public class MainWindow extends JFrame {
             for (Component c : p.getComponents()) {
                 if (c instanceof JLabel) {
                     boolean active = k.equals(key);
-                    ((JLabel)c).setFont(Theme.font(active ? Font.BOLD : Font.PLAIN, 13));
+                    ((JLabel)c).setFont(Theme.font(active ? Font.BOLD : Font.PLAIN, 17));
                     ((JLabel)c).setForeground(active ? Color.WHITE : new Color(255,255,255,145));
                 }
             }
@@ -440,31 +496,18 @@ public class MainWindow extends JFrame {
             BorderFactory.createMatteBorder(0,0,1,0,Theme.BORDER),
             BorderFactory.createEmptyBorder(8,20,8,20)));
 
-        JPanel searchWrap = new JPanel(new BorderLayout());
-        searchWrap.setBackground(Theme.BG_INPUT);
-        searchWrap.setBorder(new RoundBorder(8,Theme.BORDER,1));
-        searchWrap.setPreferredSize(new Dimension(260,34));
-        JLabel sIcon = new JLabel("  \uD83D\uDD0D ");
-        sIcon.setFont(Theme.font(Font.PLAIN,14)); sIcon.setForeground(Theme.TEXT_MUTE);
-        JTextField search = new JTextField();
-        search.setOpaque(false);
-        search.setBorder(BorderFactory.createEmptyBorder(0,0,0,8));
-        search.setFont(Theme.font(Font.PLAIN,16)); search.setForeground(Theme.TEXT_DARK);
-        search.setCaretColor(Theme.PRIMARY);
-        searchWrap.add(sIcon, BorderLayout.WEST); searchWrap.add(search, BorderLayout.CENTER);
-        bar.add(searchWrap, BorderLayout.WEST);
+        // search bar removed — notes/chat have their own search
 
         JPanel right = new JPanel();
         right.setLayout(new BoxLayout(right, BoxLayout.X_AXIS));
         right.setBackground(Theme.BG_CARD);
 
-        if (user.isFaculty()) {
-            Color chipFg = user.role.equals("FACULTY") ? Theme.ACCENT_TEAL : Theme.ACCENT_VIOLET;
-            Color chipBg = new Color(chipFg.getRed(),chipFg.getGreen(),chipFg.getBlue(),30);
-            JLabel badge = Theme.chip(user.role.equals("FACULTY") ? " \uD83D\uDC69\u200D\uD83C\uDFEB Faculty " : " \uD83D\uDEE1 Admin ", chipFg, chipBg);
-            right.add(badge);
-            right.add(Box.createHorizontalStrut(8));
-        }
+        // ── Notification bell ──────────────────────────────────────────────
+        bellBtn = buildBellButton(user);
+        right.add(bellBtn);
+        right.add(Box.createHorizontalStrut(8));
+
+        // role chip badge removed
 
         String dn = user.fullName.length()>22 ? user.fullName.substring(0,22)+"…" : user.fullName;
         JPanel pill = new JPanel() {
@@ -481,11 +524,10 @@ public class MainWindow extends JFrame {
         pill.setBorder(BorderFactory.createEmptyBorder(4,10,4,14));
 
         JPanel avT=buildAvatarPanel(user,26);
-        avT.setPreferredSize(new Dimension(26,26)); avT.setMinimumSize(new Dimension(26,26)); avT.setMaximumSize(new Dimension(26,26));
+        avT.setPreferredSize(new Dimension(34,34)); avT.setMinimumSize(new Dimension(34,34)); avT.setMaximumSize(new Dimension(34,34));
         JLabel nL=new JLabel(dn); nL.setFont(Theme.font(Font.BOLD,15)); nL.setForeground(Theme.TEXT_DARK);
-        JLabel rL=new JLabel(user.role.toLowerCase()); rL.setFont(Theme.FONT_TINY); rL.setForeground(Theme.TEXT_MUTE);
         JPanel nc=new JPanel(); nc.setLayout(new BoxLayout(nc,BoxLayout.Y_AXIS)); nc.setOpaque(false);
-        nc.add(nL); nc.add(rL);
+        nc.add(nL);
 
         pill.add(avT); pill.add(Box.createHorizontalStrut(8)); pill.add(nc);
         Dimension pillPref=new Dimension(26+8+Math.max(120,dn.length()*7+20)+24,36);
@@ -502,6 +544,117 @@ public class MainWindow extends JFrame {
             if (online) { DataStore.loadAll(); revalidate(); repaint(); }
         }));
         return bar;
+    }
+
+    private JButton bellBtn;
+    private int bellBadgeCount = 0;
+
+    private JButton buildBellButton(DataStore.User user) {
+        JButton bell = new JButton() {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                if (getModel().isRollover()) {
+                    g2.setColor(Theme.BG_INPUT); g2.fillRoundRect(0,0,getWidth(),getHeight(),8,8);
+                }
+                g2.setFont(new Font("SansSerif", Font.PLAIN, 26));
+                FontMetrics fm = g2.getFontMetrics();
+                String bell2 = "\uD83D\uDD14";
+                g2.setColor(Theme.TEXT_DARK);
+                g2.drawString(bell2, (getWidth()-fm.stringWidth(bell2))/2, (getHeight()+fm.getAscent()-fm.getDescent())/2);
+                // Badge — red pill with count
+                if (bellBadgeCount > 0) {
+                    String cnt = bellBadgeCount > 9 ? "9+" : String.valueOf(bellBadgeCount);
+                    g2.setFont(new Font("SansSerif", Font.BOLD, 10));
+                    FontMetrics fm2 = g2.getFontMetrics();
+                    int badgeW = Math.max(18, fm2.stringWidth(cnt) + 8);
+                    int badgeH = 18;
+                    int bx = getWidth() - badgeW - 1;
+                    int by = 1;
+                    // Shadow for contrast
+                    g2.setColor(new Color(0, 0, 0, 80));
+                    g2.fillRoundRect(bx + 1, by + 1, badgeW, badgeH, badgeH, badgeH);
+                    // Red pill
+                    g2.setColor(new Color(0xEF4444));
+                    g2.fillRoundRect(bx, by, badgeW, badgeH, badgeH, badgeH);
+                    // White number
+                    g2.setColor(Color.WHITE);
+                    g2.drawString(cnt, bx + (badgeW - fm2.stringWidth(cnt)) / 2,
+                        by + fm2.getAscent() + (badgeH - fm2.getAscent() - fm2.getDescent()) / 2);
+                }
+                g2.dispose();
+            }
+        };
+        bell.setPreferredSize(new Dimension(44, 44));
+        bell.setMinimumSize(new Dimension(44, 44));
+        bell.setMaximumSize(new Dimension(44, 44));
+        bell.setOpaque(false); bell.setContentAreaFilled(false); bell.setBorderPainted(false);
+        bell.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        bell.addActionListener(e -> showNotificationDropdown(user, bell));
+
+        // Register badge listener
+        com.campusshare.ui.NotificationService.get().addBadgeListener(count -> {
+            bellBadgeCount = count; if (bell != null) bell.repaint();
+        });
+        com.campusshare.ui.NotificationService.get().refreshBadge();
+        return bell;
+    }
+
+    private JWindow notifWindow = null;
+
+    private void showNotificationDropdown(DataStore.User user, JButton bell) {
+        // Dismiss any existing popup
+        if (notifWindow != null) { notifWindow.dispose(); notifWindow = null; return; }
+
+        com.campusshare.ui.NotificationPanel np =
+            new com.campusshare.ui.NotificationPanel(user, () -> {
+                if (notifWindow != null) { notifWindow.dispose(); notifWindow = null; }
+            });
+
+        JWindow win = new JWindow(this);
+        win.setLayout(new BorderLayout());
+        win.add(np, BorderLayout.CENTER);
+
+        // Give it a subtle drop-shadow border
+        JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(255, 255, 255, 30), 1),
+            BorderFactory.createEmptyBorder(0, 0, 0, 0)));
+        wrapper.setBackground(Theme.BG_CARD);
+        wrapper.add(np, BorderLayout.CENTER);
+        win.setContentPane(wrapper);
+        win.pack();
+
+        Dimension ps = np.getPreferredSize();
+        win.setSize(ps.width, ps.height);
+
+        // Position: right-align with bell, clamp to screen bounds
+        Point bellOnScreen = bell.getLocationOnScreen();
+        Dimension screen   = Toolkit.getDefaultToolkit().getScreenSize();
+        Insets   si        = Toolkit.getDefaultToolkit().getScreenInsets(getGraphicsConfiguration());
+        int screenRight  = screen.width  - si.right;
+        int screenBottom = screen.height - si.bottom;
+
+        // X: right edge of popup aligns with right edge of bell
+        int x = bellOnScreen.x + bell.getWidth() - ps.width;
+        if (x + ps.width > screenRight) x = screenRight - ps.width - 4;
+        if (x < si.left)               x = si.left + 4;
+
+        // Y: just below bell; flip above if not enough room
+        int y = bellOnScreen.y + bell.getHeight() + 4;
+        if (y + ps.height > screenBottom) y = bellOnScreen.y - ps.height - 4;
+
+        win.setLocation(x, y);
+        win.setVisible(true);
+        notifWindow = win;
+
+        // Close when clicking outside
+        win.addWindowFocusListener(new java.awt.event.WindowFocusListener() {
+            public void windowGainedFocus(java.awt.event.WindowEvent e) {}
+            public void windowLostFocus(java.awt.event.WindowEvent e) {
+                if (notifWindow != null) { notifWindow.dispose(); notifWindow = null; }
+            }
+        });
     }
 
     private JLabel buildConnectionBadge() {
@@ -548,16 +701,35 @@ public class MainWindow extends JFrame {
         return Theme.avatar(user.initials(),avColor,size);
     }
 
+    private volatile boolean loggingOut = false;
+
     private void doLogout() {
-        try { com.campusshare.remote.SupabaseClient.signOut(); } catch(Exception ignored){}
-        DataStore.cloudUserId=-1;
-        DataStore.setCurrentUser(null);
-        LoginWindow lw=new LoginWindow(()->{
-            DataStore.User u2=DataStore.getCurrentUser();
-            setContentPane(buildRootPanel(u2));
-            revalidate(); repaint();
+        // Atomic guard — if already in progress, ignore completely
+        synchronized (this) {
+            if (loggingOut) return;
+            loggingOut = true;
+        }
+        // Always run on EDT, never nested inside another event
+        SwingUtilities.invokeLater(() -> {
+            if (notifWindow != null) { notifWindow.dispose(); notifWindow = null; }
+            try { com.campusshare.remote.ConnectionMonitor.stop(); } catch (Exception ignored) {}
+            try { com.campusshare.remote.SupabaseClient.signOut(); } catch (Exception ignored) {}
+            try { com.campusshare.ui.NotificationService.get().stop(); } catch (Exception ignored) {}
+            DataStore.cloudUserId = -1;
+            DataStore.setCurrentUser(null);
+            com.campusshare.remote.CredentialStore.clear();
+            LoginWindow lw = new LoginWindow(() -> {
+                loggingOut = false;
+                notifWindow = null;
+                DataStore.User u2 = DataStore.getCurrentUser();
+                com.campusshare.ui.NotificationService.get().start(u2.id, this);
+                setContentPane(buildRootPanel(u2));
+                revalidate();
+                repaint();
+            });
+            setContentPane(lw.getContentPanel());
+            revalidate();
+            repaint();
         });
-        setContentPane(lw.getContentPanel());
-        revalidate(); repaint();
     }
 }

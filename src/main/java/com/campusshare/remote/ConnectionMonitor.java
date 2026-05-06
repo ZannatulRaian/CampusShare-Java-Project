@@ -50,6 +50,7 @@ public class ConnectionMonitor {
     public static void saveCredentials(String email, String password) {
         savedEmail = email;
         savedPassword = password;
+        reAuthFailed.set(false);  // reset backoff for new user
     }
 
     public static void addListener(Listener l) {
@@ -98,15 +99,14 @@ public class ConnectionMonitor {
         }
     }
 
+    // After one failed cloud re-auth, back off until next app restart
+    private static final AtomicBoolean reAuthFailed = new AtomicBoolean(false);
+
     private static void handleReconnect() {
         System.out.println("[ConnMonitor] Internet restored — attempting cloud reconnect...");
 
-        // Step 1: Try to get a Supabase session.
-        // Only sign in via Supabase if credentials exist.
-        // Demo accounts (admin@campus.edu etc.) only exist in SQLite,
-        // so we ONLY try Supabase login here — do NOT fall back to local.
         boolean cloudSession = false;
-        if (savedEmail != null && savedPassword != null && SupabaseConfig.isConfigured()) {
+        if (!reAuthFailed.get() && savedEmail != null && savedPassword != null && SupabaseConfig.isConfigured()) {
             try {
                 JSONObject session = SupabaseClient.signIn(savedEmail, savedPassword);
                 if (session != null && session.has("access_token")) {
@@ -116,20 +116,21 @@ public class ConnectionMonitor {
                     String uid     = session.getJSONObject("user").getString("id");
                     SupabaseClient.setSession(token, refresh, uid, exp);
                     cloudSession = true;
+                    reAuthFailed.set(false);
                     System.out.println("[ConnMonitor] Cloud session established.");
                 } else {
-                    // Supabase account does not exist for this user yet.
-                    // This is normal if they only have a local demo account.
+                    // No Supabase account — mark failed so we stop retrying
+                    reAuthFailed.set(true);
                     System.out.println("[ConnMonitor] No Supabase account for " + savedEmail
-                        + " — sync skipped. Sign Up in the app to create a cloud account.");
+                        + " — sync skipped. Running offline.");
                 }
             } catch (Exception e) {
                 System.err.println("[ConnMonitor] Re-auth error: " + e.getMessage());
             }
+        } else if (reAuthFailed.get()) {
+            System.out.println("[ConnMonitor] Skipping re-auth — no cloud account for this user.");
         }
 
-        // Step 2: Only sync if we have a real cloud session.
-        // Without a session, all inserts hit the RLS wall (HTTP 401).
         if (cloudSession) {
             SyncManager.SyncResult result = SyncManager.syncLocalToCloud();
             if (result.anyChanged()) {
@@ -137,7 +138,6 @@ public class ConnectionMonitor {
             } else {
                 System.out.println("[ConnMonitor] Already in sync — nothing to push.");
             }
-            // Step 3: Reload fresh cloud data
             DataStore.loadAll();
         } else {
             System.out.println("[ConnMonitor] Skipping sync — no cloud session.");

@@ -77,14 +77,14 @@ public class ForumPanel extends JPanel {
         searchWrap.setAlignmentX(LEFT_ALIGNMENT);
 
         JLabel searchIcon = new JLabel("🔍");
-        searchIcon.setFont(Theme.font(Font.PLAIN, 14));
+        searchIcon.setFont(Theme.font(Font.PLAIN, 24));
         searchIcon.setForeground(Theme.TEXT_MUTE);
 
         userSearchField = new JTextField();
         userSearchField.setBackground(Theme.BG_INPUT);
         userSearchField.setForeground(Theme.TEXT_DARK);
         userSearchField.setCaretColor(Theme.PRIMARY);
-        userSearchField.setFont(Theme.font(Font.PLAIN, 15));
+        userSearchField.setFont(Theme.font(Font.PLAIN, 22));
         userSearchField.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createLineBorder(Theme.BORDER),
             BorderFactory.createEmptyBorder(5, 8, 5, 8)));
@@ -105,10 +105,15 @@ public class ForumPanel extends JPanel {
         // thin divider
         side.add(makeDivider());
 
-        // ── 3. Group channels ─────────────────────────────────────────────────
+        // ── 3. Group channels — filtered by department access ─────────────────
         side.add(sectionLabel("CHANNELS"));
-        for (String ch : new String[]{"general", "cse", "eee", "announcements"}) {
-            side.add(channelBtn(ch));
+        DataStore.reloadChannels();
+        for (DataStore.Channel ch : DataStore.CHANNELS) {
+            if (user.canAccessChannel(ch)) side.add(channelBtn(ch.name));
+        }
+        // Admin: add/remove channel button
+        if (user.isAdmin()) {
+            side.add(adminChannelMgmtBtn(side));
         }
         side.add(makeDivider());
 
@@ -225,6 +230,8 @@ public class ForumPanel extends JPanel {
         List<DataStore.User> all = DAO.getAllUsers();
         for (DataStore.User u : all) {
             if (u.id == user.id) continue;
+            // DM privacy: students can only DM users in same dept or faculty/admin
+            if (!user.isFaculty() && !u.isFaculty() && !u.department.equalsIgnoreCase(user.department)) continue;
             if (!query.isEmpty() && !u.fullName.toLowerCase().contains(query)) continue;
             userListPanel.add(dmUserBtn(u));
         }
@@ -252,6 +259,109 @@ public class ForumPanel extends JPanel {
         return d;
     }
 
+    /** Admin-only button to add/remove channels */
+    private JButton adminChannelMgmtBtn(JPanel side) {
+        JButton btn = new JButton("+ Manage Channels");
+        btn.setFont(Theme.font(Font.PLAIN, 16));
+        btn.setForeground(Theme.PRIMARY);
+        btn.setBackground(Theme.BG_SUBTLE);
+        btn.setBorder(BorderFactory.createEmptyBorder(4, 12, 4, 12));
+        btn.setAlignmentX(LEFT_ALIGNMENT);
+        btn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 34));
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.addMouseListener(new MouseAdapter() {
+            public void mousePressed(MouseEvent e) { showChannelMgmtDialog(side); }
+        });
+        return btn;
+    }
+
+    private void showChannelMgmtDialog(JPanel side) {
+        JDialog dlg = new JDialog(SwingUtilities.getWindowAncestor(this), "Manage Channels", Dialog.ModalityType.APPLICATION_MODAL);
+        dlg.setSize(420, 380); dlg.setLocationRelativeTo(this);
+        JPanel p = new JPanel(new BorderLayout(0, 10));
+        p.setBackground(Theme.BG_CARD);
+        p.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+
+        JLabel hdr = new JLabel("Manage Chat Channels");
+        hdr.setFont(Theme.font(Font.BOLD, 19)); hdr.setForeground(Theme.TEXT_DARK);
+        p.add(hdr, BorderLayout.NORTH);
+
+        // Existing channels list
+        DefaultListModel<String> model = new DefaultListModel<>();
+        DataStore.CHANNELS.forEach(ch -> model.addElement(ch.name + " [" + ch.department + "]"));
+        JList<String> list = new JList<>(model);
+        list.setBackground(Theme.BG_INPUT); list.setForeground(Theme.TEXT_DARK);
+        list.setFont(Theme.font(Font.PLAIN, 24));
+        JScrollPane sp = new JScrollPane(list); sp.setBorder(null);
+        sp.setPreferredSize(new Dimension(0, 160));
+
+        JPanel delRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        delRow.setOpaque(false);
+        JButton delBtn = new JButton("🗑 Delete Selected Channel");
+        delBtn.setBackground(new Color(0xF43F5E)); delBtn.setForeground(Color.WHITE);
+        delBtn.setFont(Theme.font(Font.BOLD, 19));
+        delBtn.addMouseListener(new MouseAdapter() {
+            public void mousePressed(MouseEvent e) {
+                int idx = list.getSelectedIndex();
+                if (idx < 0) return;
+                String selName = DataStore.CHANNELS.get(idx).name;
+                if ("general".equalsIgnoreCase(selName)) {
+                    JOptionPane.showMessageDialog(dlg, "Cannot delete the general channel."); return;
+                }
+                if (JOptionPane.showConfirmDialog(dlg, "Delete channel #" + selName + " and all its messages?",
+                    "Confirm", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
+                    DAO.deleteChannel(selName);
+                    DataStore.reloadChannels();
+                    model.remove(idx);
+                    if (currentChannel.equals(selName)) {
+                        currentChannel = "general"; isDM = false; dmTarget = null;
+                    }
+                    rebuildAll();
+                }
+            }
+        });
+        delRow.add(delBtn);
+
+        // Add new channel form
+        JPanel addRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
+        addRow.setOpaque(false);
+        JTextField nameF = Theme.styledField("channel-name"); nameF.setPreferredSize(new Dimension(120, 30));
+        String[] depts = {"ALL","CSE","EEE","BBA","LAW","ENG","MATH"};
+        JComboBox<String> deptBox = new JComboBox<>(depts);
+        deptBox.setBackground(Theme.BG_INPUT); deptBox.setForeground(Theme.TEXT_DARK);
+        deptBox.setFont(Theme.font(Font.PLAIN, 19));
+        JCheckBox genChk = new JCheckBox("General (all depts)");
+        genChk.setOpaque(false); genChk.setForeground(Theme.TEXT_MUTE); genChk.setFont(Theme.font(Font.PLAIN, 19));
+        JButton addBtn = Theme.primaryButton("+ Add");
+        addBtn.addMouseListener(new MouseAdapter() {
+            public void mousePressed(MouseEvent e) {
+                String nm = nameF.getText().trim().toLowerCase().replaceAll("\\s+","-");
+                if (nm.isEmpty()) return;
+                String dept = genChk.isSelected() ? "ALL" : (String) deptBox.getSelectedItem();
+                boolean ok = DAO.addChannel(nm, dept, genChk.isSelected());
+                if (ok) {
+                    DataStore.reloadChannels();
+                    model.clear();
+                    DataStore.CHANNELS.forEach(ch -> model.addElement(ch.name + " [" + ch.department + "]"));
+                    nameF.setText(""); rebuildAll();
+                } else {
+                    JOptionPane.showMessageDialog(dlg, "Channel already exists.");
+                }
+            }
+        });
+        addRow.add(new JLabel("Name:")); addRow.add(nameF);
+        addRow.add(new JLabel("Dept:")); addRow.add(deptBox);
+        addRow.add(genChk); addRow.add(addBtn);
+
+        JPanel center = new JPanel(new BorderLayout(0, 6));
+        center.setOpaque(false);
+        center.add(sp, BorderLayout.CENTER);
+        center.add(delRow, BorderLayout.SOUTH);
+        p.add(center, BorderLayout.CENTER);
+        p.add(addRow, BorderLayout.SOUTH);
+        dlg.setContentPane(p); dlg.setVisible(true);
+    }
+
     private JPanel channelBtn(String ch) {
         boolean active = !isDM && ch.equals(currentChannel);
         JPanel btn = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5)) {
@@ -264,11 +374,11 @@ public class ForumPanel extends JPanel {
             }
         };
         btn.setOpaque(false);
-        btn.setMaximumSize(new Dimension(210, 32));
+        btn.setMaximumSize(new Dimension(210, 48));
         btn.setAlignmentX(LEFT_ALIGNMENT);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         JLabel lbl = new JLabel("# " + ch);
-        lbl.setFont(Theme.font(active ? Font.BOLD : Font.PLAIN, 12));
+        lbl.setFont(Theme.font(active ? Font.BOLD : Font.PLAIN, 16));
         lbl.setForeground(active ? Theme.PRIMARY : Theme.TEXT_MUTE);
         btn.add(lbl);
         btn.addMouseListener(new MouseAdapter() {
@@ -288,19 +398,19 @@ public class ForumPanel extends JPanel {
             }
         };
         btn.setOpaque(false);
-        btn.setMaximumSize(new Dimension(210, 40));
+        btn.setMaximumSize(new Dimension(210, 48));
         btn.setAlignmentX(LEFT_ALIGNMENT);
         btn.setBorder(BorderFactory.createEmptyBorder(4, 10, 4, 10));
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
         Color avColor = u.isFaculty() ? Theme.BLOCK_TEAL : Theme.BLOCK_INDIGO;
         JPanel av = Theme.avatar(u.initials(), avColor, 28);
-        av.setPreferredSize(new Dimension(28, 28));
+        av.setPreferredSize(new Dimension(36, 36));
 
         JPanel namePanel = new JPanel(); namePanel.setOpaque(false);
         namePanel.setLayout(new BoxLayout(namePanel, BoxLayout.Y_AXIS));
         JLabel nameL = new JLabel(u.firstName());
-        nameL.setFont(Theme.font(Font.BOLD, 14));
+        nameL.setFont(Theme.font(Font.BOLD, 17));
         nameL.setForeground(active ? Theme.PRIMARY : Theme.TEXT_DARK);
         JLabel roleL = new JLabel(u.role.toLowerCase());
         roleL.setFont(Theme.FONT_TINY); roleL.setForeground(Theme.TEXT_FAINT);
@@ -355,7 +465,7 @@ public class ForumPanel extends JPanel {
         JPanel badge = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
         badge.setOpaque(false);
         JLabel dotLbl = new JLabel("●");
-        dotLbl.setFont(Theme.font(Font.PLAIN, 12)); dotLbl.setForeground(Theme.SUCCESS);
+        dotLbl.setFont(Theme.font(Font.PLAIN, 16)); dotLbl.setForeground(Theme.SUCCESS);
         long onlineCnt = allUsers.stream().filter(DataStore.User::isOnline).count();
         JLabel cntLbl = new JLabel(onlineCnt + " online");
         cntLbl.setFont(Theme.FONT_TINY); cntLbl.setForeground(Theme.TEXT_MUTE);
@@ -398,7 +508,7 @@ public class ForumPanel extends JPanel {
             BorderFactory.createEmptyBorder(10, 16, 10, 16)));
         inputField = Theme.styledField("Type a message…");
         JButton send = Theme.primaryButton("Send");
-        send.setPreferredSize(new Dimension(80, 34));
+        send.setPreferredSize(new Dimension(90, 44));
         send.addActionListener(e -> sendMessage());
         inputField.addActionListener(e -> sendMessage());
         inputBar.add(inputField, BorderLayout.CENTER);
@@ -451,7 +561,7 @@ public class ForumPanel extends JPanel {
         }
         if (msgs.isEmpty()) {
             JLabel empty = new JLabel("No messages yet. Say hello! 👋");
-            empty.setFont(Theme.font(Font.PLAIN, 16));
+            empty.setFont(Theme.font(Font.PLAIN, 19));
             empty.setForeground(Theme.TEXT_FAINT);
             empty.setAlignmentX(CENTER_ALIGNMENT);
             messagesPanel.add(Box.createVerticalGlue());
@@ -546,13 +656,39 @@ public class ForumPanel extends JPanel {
         String text = inputField.getText().trim();
         if (text.isEmpty()) return;
 
-        int id = isDM && dmTarget != null
-            ? DAO.saveDirectMessage(user.id, dmTarget.id, text)
-            : DAO.saveMessage(user.id, currentChannel, text);
+        int id;
+        if (isDM && dmTarget != null) {
+            id = DAO.saveDirectMessage(user.id, dmTarget.id, text);
+            // Notify recipient of DM
+            if (id > 0) {
+                DAO.pushNotification(dmTarget.id, "chat",
+                    "DM from " + user.firstName(), text.length() > 60 ? text.substring(0,60)+"…" : text, id);
+                com.campusshare.ui.NotificationService.get().refreshBadge();
+            }
+        } else {
+            id = DAO.saveMessage(user.id, currentChannel, text);
+            // Notify other channel members
+            if (id > 0) {
+                // Find channel dept
+                String chDept = DataStore.CHANNELS.stream()
+                    .filter(ch -> ch.name.equals(currentChannel))
+                    .map(ch -> ch.department).findFirst().orElse("ALL");
+                // Notify all users who can see this channel (except sender)
+                List<DataStore.User> allUsers = DAO.getAllUsers();
+                for (DataStore.User u : allUsers) {
+                    if (u.id == user.id) continue;
+                    DataStore.Channel chObj = DataStore.CHANNELS.stream()
+                        .filter(ch -> ch.name.equals(currentChannel)).findFirst().orElse(null);
+                    if (chObj != null && u.canAccessChannel(chObj)) {
+                        DAO.pushNotification(u.id, "chat",
+                            "#" + currentChannel + " — " + user.firstName(),
+                            text.length() > 60 ? text.substring(0,60)+"…" : text, id);
+                    }
+                }
+            }
+        }
 
         if (id > 0) {
-            // Update lastLoadedMsgId so the auto-refresh does NOT wipe this message
-            // before the DB round-trip confirms it.
             lastLoadedMsgId = id;
             DataStore.Message m = new DataStore.Message(id, user.id, user.fullName, text,
                 java.time.LocalTime.now().toString().substring(0, 5), user.isFaculty());

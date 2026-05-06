@@ -59,6 +59,13 @@ public class ProfilePanel extends JPanel {
             cols.add(buildCloudCard(), g);
         }
 
+        // Admin/Faculty: manage user semesters
+        if (user.isAdmin() || user.isFaculty()) {
+            g.gridx = 0; g.gridy = user.isAdmin() ? 2 : 1; g.gridwidth = 2; g.weightx = 1;
+            g.insets = new Insets(14, 0, 0, 0);
+            cols.add(buildUserSemesterCard(), g);
+        }
+
         JScrollPane sp = new JScrollPane(cols);
         sp.setBorder(null); sp.setOpaque(false); sp.getViewport().setOpaque(false);
         sp.getVerticalScrollBar().setUnitIncrement(12);
@@ -93,7 +100,7 @@ public class ProfilePanel extends JPanel {
 
         // Name label in banner
         JLabel nameInBanner = new JLabel(user.fullName);
-        nameInBanner.setFont(new Font("SansSerif", Font.BOLD, 18));
+        nameInBanner.setFont(new Font("SansSerif", Font.BOLD, 22));
         nameInBanner.setForeground(Color.WHITE);
         nameInBanner.setBounds(AVATAR_SIZE + 36, 30, 260, 22);
         banner.add(nameInBanner);
@@ -128,7 +135,26 @@ public class ProfilePanel extends JPanel {
         addEditableField(body, "Full Name",  user.fullName);
         addEditableField(body, "Email",      user.email);
         addEditableField(body, "Department", user.department);
-        if (user.semester > 0) addEditableField(body, "Semester", String.valueOf(user.semester));
+        
+        // Student ID field (read-only for students, editable for admin/faculty)
+        if (user.studentId != null && !user.studentId.isEmpty() || user.isAdmin() || user.isFaculty()) {
+            addEditableField(body, "Student ID", user.studentId != null ? user.studentId : "");
+            JTextField idField = fields.get("Student ID");
+            if (idField != null) {
+                idField.setEditable(user.isAdmin() || user.isFaculty());
+                if (!user.isAdmin() && !user.isFaculty()) idField.setForeground(Theme.TEXT_MUTE);
+            }
+        }
+        
+        // Semester field (editable by self or admin/faculty)
+        if (user.semester > 0) {
+            addEditableField(body, "Semester", String.valueOf(user.semester));
+            JTextField semField = fields.get("Semester");
+            if (semField != null && !user.isAdmin() && !user.isFaculty()) {
+                semField.setEditable(false);
+                semField.setForeground(Theme.TEXT_MUTE);
+            }
+        }
         addEditableField(body, "Role", user.role);
         body.add(Box.createVerticalStrut(14));
 
@@ -146,15 +172,34 @@ public class ProfilePanel extends JPanel {
 
         JButton saveBtn = Theme.primaryButton("Save Changes");
         saveBtn.setAlignmentX(LEFT_ALIGNMENT);
+        saveBtn.setPreferredSize(new Dimension(200, 42));
+        saveBtn.setMaximumSize(new Dimension(200, 42));
         saveBtn.addActionListener(e -> {
             String newName = fields.getOrDefault("Full Name", new JTextField(user.fullName)).getText().trim();
             String newDept = fields.getOrDefault("Department", new JTextField(user.department)).getText().trim();
+            String newStudentId = "";
             int newSem = user.semester;
+            
+            // Get student ID if available
+            JTextField idF = fields.get("Student ID");
+            if (idF != null) newStudentId = idF.getText().trim();
+            
+            // Get semester (allow admin/faculty to change it)
             JTextField semF = fields.get("Semester");
-            if (semF != null) { String sv = semF.getText().replaceAll("[^0-9]",""); if (!sv.isEmpty()) newSem = Integer.parseInt(sv); }
+            if (semF != null) { 
+                String sv = semF.getText().replaceAll("[^0-9]",""); 
+                if (!sv.isEmpty()) newSem = Integer.parseInt(sv); 
+            }
+            
             boolean ok = DAO.updateProfile(user.id, newName, newDept, newSem);
+            if (ok && !newStudentId.isEmpty()) {
+                DAO.updateStudentId(user.id, newStudentId);
+                user.studentId = newStudentId;
+            }
             if (ok) {
-                user.fullName = newName; user.department = newDept; user.semester = newSem;
+                user.fullName = newName; 
+                user.department = newDept; 
+                user.semester = newSem;
                 JOptionPane.showMessageDialog(this,"Profile updated!","Success",JOptionPane.INFORMATION_MESSAGE);
             } else {
                 JOptionPane.showMessageDialog(this,"Update failed.","Error",JOptionPane.ERROR_MESSAGE);
@@ -203,6 +248,101 @@ public class ProfilePanel extends JPanel {
                 g2.dispose();
             }
         };
+    }
+
+    /** Admin/Faculty panel: look up a user and change their semester */
+    private JPanel buildUserSemesterCard() {
+        JPanel card = Theme.card();
+        card.setLayout(new BorderLayout(0, 0));
+
+        // Header
+        JPanel hdr = new JPanel(new BorderLayout());
+        hdr.setOpaque(false);
+        hdr.setBorder(BorderFactory.createEmptyBorder(16, 20, 10, 20));
+        JLabel title = new JLabel("Manage User Semesters");
+        title.setFont(Theme.font(Font.BOLD, 17));
+        title.setForeground(Theme.TEXT_DARK);
+        JLabel sub = new JLabel("Update the semester for any student");
+        sub.setFont(Theme.FONT_SMALL); sub.setForeground(Theme.TEXT_MUTE);
+        JPanel hdrText = new JPanel(); hdrText.setLayout(new BoxLayout(hdrText, BoxLayout.Y_AXIS)); hdrText.setOpaque(false);
+        hdrText.add(title); hdrText.add(sub);
+        hdr.add(hdrText, BorderLayout.WEST);
+        card.add(hdr, BorderLayout.NORTH);
+
+        // Form row
+        JPanel form = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 10));
+        form.setOpaque(false);
+        form.setBorder(BorderFactory.createEmptyBorder(0, 14, 12, 14));
+
+        // User selector — reload each time card is built
+        java.util.List<DataStore.User> users = DAO.getAllUsers();
+        DataStore.User[] students = users.stream()
+            .filter(u -> "STUDENT".equalsIgnoreCase(u.role))
+            .toArray(DataStore.User[]::new);
+
+        JComboBox<DataStore.User> userBox = new JComboBox<>(students);
+        userBox.setBackground(Theme.BG_INPUT); userBox.setForeground(Theme.TEXT_DARK);
+        userBox.setFont(Theme.font(Font.PLAIN, 14));
+        userBox.setPreferredSize(new Dimension(220, 34));
+        userBox.setRenderer(new DefaultListCellRenderer() {
+            public Component getListCellRendererComponent(JList<?> l, Object v, int i, boolean s, boolean f) {
+                super.getListCellRendererComponent(l, v, i, s, f);
+                if (v instanceof DataStore.User u2) {
+                    setText(u2.fullName + (u2.studentId != null && !u2.studentId.isEmpty() ? " [" + u2.studentId + "]" : "") + "  (Sem " + u2.semester + ")");
+                }
+                setBackground(s ? Theme.PRIMARY : Theme.BG_INPUT);
+                setForeground(Theme.TEXT_DARK);
+                return this;
+            }
+        });
+
+        String[] semOpts = {"1","2","3","4","5","6","7","8"};
+        JComboBox<String> newSemBox = new JComboBox<>(semOpts);
+        newSemBox.setBackground(Theme.BG_INPUT); newSemBox.setForeground(Theme.TEXT_DARK);
+        newSemBox.setFont(Theme.font(Font.PLAIN, 14));
+        newSemBox.setPreferredSize(new Dimension(80, 34));
+
+        // Sync semester selector with selected user
+        userBox.addActionListener(e -> {
+            DataStore.User sel = (DataStore.User) userBox.getSelectedItem();
+            if (sel != null && sel.semester >= 1 && sel.semester <= 8)
+                newSemBox.setSelectedItem(String.valueOf(sel.semester));
+        });
+        if (students.length > 0 && students[0].semester >= 1)
+            newSemBox.setSelectedItem(String.valueOf(students[0].semester));
+
+        JLabel statusLbl = new JLabel(" ");
+        statusLbl.setFont(Theme.FONT_SMALL);
+        statusLbl.setForeground(Theme.BLOCK_TEAL);
+
+        JButton applyBtn = Theme.primaryButton("Update Semester");
+        applyBtn.setPreferredSize(new Dimension(160, 34));
+        applyBtn.addActionListener(e -> {
+            DataStore.User sel = (DataStore.User) userBox.getSelectedItem();
+            if (sel == null) return;
+            int newSem = Integer.parseInt((String) newSemBox.getSelectedItem());
+            boolean ok = DAO.updateProfile(sel.id, sel.fullName, sel.department, newSem);
+            if (ok) {
+                sel.semester = newSem;
+                statusLbl.setText("✓ " + sel.fullName + " → Semester " + newSem);
+                statusLbl.setForeground(Theme.BLOCK_TEAL);
+                userBox.repaint();
+            } else {
+                statusLbl.setText("✗ Update failed.");
+                statusLbl.setForeground(new Color(0xF43F5E));
+            }
+        });
+
+        JLabel userLbl  = new JLabel("Student:"); userLbl.setFont(Theme.font(Font.PLAIN,14)); userLbl.setForeground(Theme.TEXT_MUTE);
+        JLabel semLbl   = new JLabel("New Semester:"); semLbl.setFont(Theme.font(Font.PLAIN,14)); semLbl.setForeground(Theme.TEXT_MUTE);
+
+        form.add(userLbl); form.add(userBox);
+        form.add(semLbl);  form.add(newSemBox);
+        form.add(applyBtn);
+        form.add(statusLbl);
+
+        card.add(form, BorderLayout.CENTER);
+        return card;
     }
 
     private void changePhoto() {
@@ -263,7 +403,7 @@ public class ProfilePanel extends JPanel {
         };
         header.setOpaque(false); header.setPreferredSize(new Dimension(0, 60));
         header.setLayout(new FlowLayout(FlowLayout.LEFT, 16, 14));
-        JLabel lock = new JLabel("🔒"); lock.setFont(Theme.font(Font.PLAIN, 20));
+        JLabel lock = new JLabel("🔒"); lock.setFont(Theme.font(Font.PLAIN, 24));
         JPanel headerText = new JPanel(new GridLayout(2,1,0,2)); headerText.setOpaque(false);
         JLabel ht1 = new JLabel("Change Password"); ht1.setFont(Theme.FONT_H2); ht1.setForeground(Theme.TEXT_DARK);
         JLabel ht2 = new JLabel("Update your account password"); ht2.setFont(Theme.FONT_SMALL); ht2.setForeground(Theme.TEXT_MUTE);
@@ -297,6 +437,8 @@ public class ProfilePanel extends JPanel {
 
         JButton changeBtn = Theme.primaryButton("Update Password");
         changeBtn.setAlignmentX(LEFT_ALIGNMENT);
+        changeBtn.setPreferredSize(new Dimension(200, 42));
+        changeBtn.setMaximumSize(new Dimension(200, 42));
         changeBtn.addActionListener(e -> {
             String cur = new String(currentPF.getPassword());
             String nw  = new String(newPF.getPassword());

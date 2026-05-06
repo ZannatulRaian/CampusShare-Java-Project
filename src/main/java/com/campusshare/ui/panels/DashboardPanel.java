@@ -1,12 +1,34 @@
 package com.campusshare.ui.panels;
 
-import com.campusshare.data.DataStore;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.GradientPaint;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.GridLayout;
+import java.awt.Insets;
+import java.awt.RadialGradientPaint;
+import java.awt.RenderingHints;
+import java.awt.geom.Point2D;
 import java.util.function.Consumer;
-import com.campusshare.ui.*;
-import javax.swing.*;
-import javax.swing.border.*;
-import java.awt.*;
-import java.awt.geom.*;
+
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JSeparator;
+import javax.swing.SwingConstants;
+
+import com.campusshare.data.DataStore;
+import com.campusshare.ui.Theme;
 
 /**
  * Dashboard — Bento-grid layout inspired by bold campus app design.
@@ -121,7 +143,7 @@ public class DashboardPanel extends JPanel {
 
         // Big greeting
         JLabel greeting = new JLabel("Hey, " + user.firstName() + " \uD83D\uDC4B");
-        greeting.setFont(new Font("SansSerif", Font.BOLD, 30));
+        greeting.setFont(new Font("SansSerif", Font.BOLD, 34));
         greeting.setForeground(Color.WHITE);
         greeting.setBounds(24, 18, 500, 36);
         card.add(greeting);
@@ -130,32 +152,26 @@ public class DashboardPanel extends JPanel {
         String sub = user.role + "  ·  " + user.department
             + (user.semester > 0 ? "  ·  Semester " + user.semester : "");
         JLabel subLbl = new JLabel(sub);
-        subLbl.setFont(Theme.font(Font.PLAIN, 16));
+        subLbl.setFont(Theme.font(Font.PLAIN, 19));
         subLbl.setForeground(new Color(255, 255, 255, 160));
         subLbl.setBounds(24, 58, 560, 18);
         card.add(subLbl);
 
         // Tiny summary line
-        long approved = DataStore.NOTES.stream().filter(n -> n.approved).count();
-        JLabel info = new JLabel(
-            approved + " notes  ·  " + DataStore.EVENTS.size() + " events  ·  "
-            + DataStore.ANNOUNCEMENTS.size() + " announcements");
-        info.setFont(Theme.font(Font.PLAIN, 14));
+        long approved = DataStore.NOTES.stream().filter(n -> n.approved)
+            .filter(n -> user.isFaculty() || (n.subjectSemester() == user.semester && n.subjectDepartment().equalsIgnoreCase(user.department)))
+            .count();
+        long evCount  = DataStore.EVENTS.stream()
+            .filter(ev -> user.isFaculty() || "ALL".equalsIgnoreCase(ev.department) || ev.department.equalsIgnoreCase(user.department))
+            .count();
+        long annCount = DataStore.ANNOUNCEMENTS.stream()
+            .filter(a -> user.isFaculty() || "ALL".equalsIgnoreCase(a.department) || a.department.equalsIgnoreCase(user.department))
+            .count();
+        JLabel info = new JLabel(approved + " notes  ·  " + evCount + " events  ·  " + annCount + " announcements");
+        info.setFont(Theme.font(Font.PLAIN, 16));
         info.setForeground(new Color(255, 255, 255, 100));
         info.setBounds(24, 84, 560, 16);
         card.add(info);
-
-        // Faculty badge if applicable
-        if (user.isFaculty()) {
-            JLabel badge = new JLabel(user.role.equals("FACULTY") ? "👩‍🏫 Faculty" : "🛡 Admin");
-            badge.setFont(Theme.font(Font.BOLD, 14));
-            badge.setForeground(new Color(0xA5F3FC));
-            badge.setBorder(BorderFactory.createCompoundBorder(
-                new RoundBorder(6, new Color(0xA5F3FC, false).brighter(), 1),
-                BorderFactory.createEmptyBorder(3, 10, 3, 10)));
-            badge.setBounds(24, 104, 120, 22);
-            card.add(badge);
-        }
 
         return card;
     }
@@ -166,13 +182,20 @@ public class DashboardPanel extends JPanel {
         row.setOpaque(false);
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 88));
 
-        long approved = DataStore.NOTES.stream().filter(n -> n.approved).count();
-        long pending  = DataStore.NOTES.stream().filter(n -> !n.approved).count();
+        long approved = DataStore.NOTES.stream().filter(n -> n.approved)
+            .filter(n -> user.isFaculty() || (n.subjectSemester() == user.semester && n.subjectDepartment().equalsIgnoreCase(user.department)))
+            .count();
+        long pending = DataStore.NOTES.stream().filter(n -> !n.approved)
+            .filter(n -> user.isFaculty() || (n.subjectSemester() == user.semester && n.subjectDepartment().equalsIgnoreCase(user.department)))
+            .count();
+        long eventCount = DataStore.EVENTS.stream()
+            .filter(ev -> user.isFaculty() || "ALL".equalsIgnoreCase(ev.department) || ev.department.equalsIgnoreCase(user.department))
+            .count();
 
-        addStatBlock(row, String.valueOf(approved),                "Notes Available",  new Color(0x4F46E5), new Color(0x1E1B4B), "notes");
-        addStatBlock(row, String.valueOf(pending),                 "Pending Review",   new Color(0xD97706), new Color(0x2A1F0A), "notes");
-        addStatBlock(row, String.valueOf(DataStore.EVENTS.size()), "Events",           new Color(0x059669), new Color(0x0A2A1F), "events");
-        addStatBlock(row, String.valueOf(DataStore.SUBJECTS.size()),"Subjects",        new Color(0x7C3AED), new Color(0x221B40), null);
+        addStatBlock(row, String.valueOf(approved),   "Notes Available", new Color(0x4F46E5), new Color(0x1E1B4B), "notes");
+        addStatBlock(row, String.valueOf(pending),    "Pending Review",  new Color(0xD97706), new Color(0x2A1F0A), "notes");
+        addStatBlock(row, String.valueOf(eventCount), "Events",          new Color(0x059669), new Color(0x0A2A1F), "events");
+        addStatBlock(row, String.valueOf(DataStore.SUBJECTS.size()), "Subjects", new Color(0x7C3AED), new Color(0x221B40), null);
         return row;
     }
 
@@ -197,13 +220,13 @@ public class DashboardPanel extends JPanel {
         }
 
         JLabel numLbl = new JLabel(value);
-        numLbl.setFont(new Font("SansSerif", Font.BOLD, 32));
+        numLbl.setFont(new Font("SansSerif", Font.BOLD, 36));
         numLbl.setForeground(accent);
         numLbl.setBounds(16, 10, 100, 38);
         block.add(numLbl);
 
         JLabel lbl = new JLabel(label);
-        lbl.setFont(Theme.font(Font.PLAIN, 14));
+        lbl.setFont(Theme.font(Font.PLAIN, 15));
         lbl.setForeground(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 180));
         lbl.setBounds(16, 50, 160, 16);
         block.add(lbl);
@@ -236,9 +259,9 @@ public class DashboardPanel extends JPanel {
         // Header row
         JPanel hdr = new JPanel(new BorderLayout()); hdr.setOpaque(false);
         JLabel title = new JLabel("Recent Notes");
-        title.setFont(Theme.font(Font.BOLD, 18)); title.setForeground(Theme.TEXT_DARK);
+        title.setFont(Theme.font(Font.BOLD, 22)); title.setForeground(Theme.TEXT_DARK);
         JLabel viewAll = new JLabel("View all →");
-        viewAll.setFont(Theme.font(Font.BOLD, 14)); viewAll.setForeground(Theme.PRIMARY);
+        viewAll.setFont(Theme.font(Font.BOLD, 17)); viewAll.setForeground(Theme.PRIMARY);
         viewAll.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         viewAll.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mousePressed(java.awt.event.MouseEvent e) {
@@ -257,14 +280,20 @@ public class DashboardPanel extends JPanel {
         Color[] typeColors = {Theme.BLOCK_ROSE, Theme.BLOCK_TEAL, Theme.BLOCK_INDIGO, Theme.BLOCK_AMBER};
         int[] idx = {0};
 
-        DataStore.NOTES.stream().filter(n -> n.approved).limit(5).forEach(n -> {
+        DataStore.NOTES.stream()
+            .filter(n -> n.approved)
+            .filter(n -> user.isFaculty() ||
+                (n.subjectSemester() == user.semester && n.subjectDepartment().equalsIgnoreCase(user.department)))
+            .limit(5).forEach(n -> {
             Color tc = typeColors[idx[0] % typeColors.length];
             String ti = typeIcons[idx[0] % typeIcons.length];
 
             JPanel row = new JPanel(new BorderLayout(10, 0));
             row.setOpaque(false);
-            row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 44));
-            row.setBorder(BorderFactory.createEmptyBorder(4, 0, 4, 0));
+            row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 52));
+            row.setMinimumSize(new Dimension(0, 52));
+            row.setPreferredSize(new Dimension(0, 52));
+            row.setBorder(BorderFactory.createEmptyBorder(6, 0, 6, 0));
 
             // Type dot
             JPanel dot = new JPanel() {
@@ -274,7 +303,7 @@ public class DashboardPanel extends JPanel {
                     g2.setColor(new Color(tc.getRed(), tc.getGreen(), tc.getBlue(), 20));
                     g2.fillRoundRect(0, 0, 34, 34, 8, 8);
                     g2.setColor(tc);
-                    g2.setFont(Theme.font(Font.PLAIN, 17));
+                    g2.setFont(Theme.font(Font.PLAIN, 24));
                     FontMetrics fm = g2.getFontMetrics();
                     g2.drawString(ti, (34 - fm.stringWidth(ti)) / 2, 22);
                     g2.dispose();
@@ -285,22 +314,20 @@ public class DashboardPanel extends JPanel {
 
             // Name + subject
             JPanel info = new JPanel(new GridLayout(2, 1, 0, 1)); info.setOpaque(false);
-            String fname = n.fileName.length() > 32 ? n.fileName.substring(0, 32) + "…" : n.fileName;
+            String fname = n.fileName.length() > 36 ? n.fileName.substring(0, 36) + "…" : n.fileName;
             JLabel fn = new JLabel(fname);
             fn.setFont(Theme.font(Font.BOLD, 15)); fn.setForeground(Theme.TEXT_DARK);
             JLabel subj = new JLabel(n.subjectName() + "  ·  " + n.uploadedBy);
             subj.setFont(Theme.FONT_SMALL); subj.setForeground(Theme.TEXT_MUTE);
             info.add(fn); info.add(subj);
 
-            // Stars + file type chip
-            JPanel right = new JPanel(new GridLayout(2, 1, 0, 1)); right.setOpaque(false);
-            JLabel star = new JLabel(n.fileType);
-            star.setFont(Theme.font(Font.PLAIN, 14));
-            star.setForeground(Theme.TEXT_MUTE);
-            star.setHorizontalAlignment(SwingConstants.RIGHT);
+            // File type chip only (removed duplicate)
+            JPanel right = new JPanel(new BorderLayout()); right.setOpaque(false);
             JLabel type = Theme.chip(n.fileType, tc, new Color(tc.getRed(), tc.getGreen(), tc.getBlue(), 18));
-            type.setHorizontalAlignment(SwingConstants.RIGHT);
-            right.add(star); right.add(type);
+            type.setHorizontalAlignment(SwingConstants.CENTER);
+            type.setFont(Theme.font(Font.BOLD, 12));
+            type.setPreferredSize(new Dimension(46, 22));
+            right.add(type, BorderLayout.CENTER);
 
             row.add(dot, BorderLayout.WEST);
             row.add(info, BorderLayout.CENTER);
@@ -322,7 +349,8 @@ public class DashboardPanel extends JPanel {
             idx[0]++;
         });
 
-        if (DataStore.NOTES.stream().noneMatch(n -> n.approved)) {
+        if (DataStore.NOTES.stream().filter(n -> n.approved)
+                .noneMatch(n -> user.isFaculty() || (n.subjectSemester() == user.semester && n.subjectDepartment().equalsIgnoreCase(user.department)))) {
             JLabel empty = new JLabel("No approved notes yet");
             empty.setFont(Theme.FONT_BODY); empty.setForeground(Theme.TEXT_FAINT);
             list.add(empty);
@@ -353,13 +381,15 @@ public class DashboardPanel extends JPanel {
         b1.setOpaque(false);
         b1.setPreferredSize(new Dimension(0, 90));
 
-        long total = DataStore.NOTES.stream().filter(n -> n.approved).count();
+        long total = DataStore.NOTES.stream().filter(n -> n.approved)
+            .filter(n -> user.isFaculty() || (n.subjectSemester() == user.semester && n.subjectDepartment().equalsIgnoreCase(user.department)))
+            .count();
         JLabel n1 = new JLabel(String.valueOf(total));
-        n1.setFont(new Font("SansSerif", Font.BOLD, 40));
+        n1.setFont(new Font("SansSerif", Font.BOLD, 32));
         n1.setForeground(Color.WHITE);
         n1.setBounds(16, 12, 120, 44);
         JLabel l1 = new JLabel("Notes Available");
-        l1.setFont(Theme.font(Font.PLAIN, 14));
+        l1.setFont(Theme.font(Font.PLAIN, 16));
         l1.setForeground(new Color(255, 255, 255, 160));
         l1.setBounds(16, 56, 160, 16);
         b1.add(n1); b1.add(l1);
@@ -384,12 +414,14 @@ public class DashboardPanel extends JPanel {
         b2.setOpaque(false);
         b2.setPreferredSize(new Dimension(0, 90));
 
-        JLabel n2 = new JLabel(String.valueOf(DataStore.EVENTS.size()));
-        n2.setFont(new Font("SansSerif", Font.BOLD, 40));
+        JLabel n2 = new JLabel(String.valueOf(DataStore.EVENTS.stream()
+            .filter(ev -> user.isFaculty() || "ALL".equalsIgnoreCase(ev.department) || ev.department.equalsIgnoreCase(user.department))
+            .count()));
+        n2.setFont(new Font("SansSerif", Font.BOLD, 32));
         n2.setForeground(Color.WHITE);
         n2.setBounds(16, 12, 120, 44);
         JLabel l2 = new JLabel("Upcoming Events");
-        l2.setFont(Theme.font(Font.PLAIN, 14));
+        l2.setFont(Theme.font(Font.PLAIN, 16));
         l2.setForeground(new Color(255, 255, 255, 160));
         l2.setBounds(16, 56, 160, 16);
         b2.add(n2); b2.add(l2);
@@ -419,7 +451,7 @@ public class DashboardPanel extends JPanel {
         outer.setBorder(BorderFactory.createEmptyBorder(14, 16, 14, 16));
 
         JLabel title = new JLabel("Upcoming Events  →");
-        title.setFont(Theme.font(Font.BOLD, 16)); title.setForeground(Theme.PRIMARY);
+        title.setFont(Theme.font(Font.BOLD, 19)); title.setForeground(Theme.PRIMARY);
         title.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         title.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mousePressed(java.awt.event.MouseEvent e) {
@@ -435,7 +467,9 @@ public class DashboardPanel extends JPanel {
 
         Color[] dots = {Theme.BLOCK_INDIGO, Theme.BLOCK_TEAL, Theme.BLOCK_ROSE, Theme.BLOCK_AMBER, Theme.BLOCK_VIOLET};
         int[] ci = {0};
-        DataStore.EVENTS.stream().limit(4).forEach(ev -> {
+        DataStore.EVENTS.stream()
+            .filter(ev -> user.isFaculty() || "ALL".equalsIgnoreCase(ev.department) || ev.department.equalsIgnoreCase(user.department))
+            .limit(4).forEach(ev -> {
             Color c = dots[ci[0] % dots.length];
             JPanel row = new JPanel(new BorderLayout(8, 0));
             row.setOpaque(false);
@@ -457,7 +491,7 @@ public class DashboardPanel extends JPanel {
 
             JPanel info = new JPanel(new GridLayout(2, 1, 0, 1)); info.setOpaque(false);
             String t = ev.title.length() > 22 ? ev.title.substring(0, 22) + "…" : ev.title;
-            JLabel tl = new JLabel(t); tl.setFont(Theme.font(Font.BOLD, 14)); tl.setForeground(Theme.TEXT_DARK);
+            JLabel tl = new JLabel(t); tl.setFont(Theme.font(Font.BOLD, 17)); tl.setForeground(Theme.TEXT_DARK);
             JLabel dl = new JLabel(ev.date + " · " + ev.time);
             dl.setFont(Theme.FONT_TINY); dl.setForeground(Theme.TEXT_MUTE);
             info.add(tl); info.add(dl);
@@ -474,7 +508,7 @@ public class DashboardPanel extends JPanel {
             ci[0]++;
         });
 
-        if (DataStore.EVENTS.isEmpty()) {
+        if (DataStore.EVENTS.stream().noneMatch(ev -> user.isFaculty() || "ALL".equalsIgnoreCase(ev.department) || ev.department.equalsIgnoreCase(user.department))) {
             JLabel empty = new JLabel("No events scheduled");
             empty.setFont(Theme.FONT_SMALL); empty.setForeground(Theme.TEXT_FAINT);
             list.add(empty);
@@ -499,7 +533,7 @@ public class DashboardPanel extends JPanel {
         outer.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
 
         JLabel title = new JLabel("Announcements  →");
-        title.setFont(Theme.font(Font.BOLD, 16)); title.setForeground(Theme.PRIMARY);
+        title.setFont(Theme.font(Font.BOLD, 19)); title.setForeground(Theme.PRIMARY);
         title.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         title.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mousePressed(java.awt.event.MouseEvent e) {
@@ -515,7 +549,9 @@ public class DashboardPanel extends JPanel {
 
         Color[] tagCols = {Theme.BLOCK_ROSE, Theme.BLOCK_AMBER, Theme.BLOCK_TEAL, Theme.BLOCK_VIOLET};
         int[] ci = {0};
-        DataStore.ANNOUNCEMENTS.stream().limit(3).forEach(a -> {
+        DataStore.ANNOUNCEMENTS.stream()
+            .filter(a -> user.isFaculty() || "ALL".equalsIgnoreCase(a.department) || a.department.equalsIgnoreCase(user.department))
+            .limit(3).forEach(a -> {
             Color c = tagCols[ci[0] % tagCols.length];
             JPanel row = new JPanel(new BorderLayout(8, 0));
             row.setOpaque(false);
@@ -532,7 +568,7 @@ public class DashboardPanel extends JPanel {
 
             JPanel content = new JPanel(new GridLayout(2, 1, 0, 2)); content.setOpaque(false);
             String t = a.title.length() > 24 ? a.title.substring(0, 24) + "…" : a.title;
-            JLabel tl = new JLabel(t); tl.setFont(Theme.font(Font.BOLD, 14)); tl.setForeground(Color.WHITE);
+            JLabel tl = new JLabel(t); tl.setFont(Theme.font(Font.BOLD, 17)); tl.setForeground(Color.WHITE);
             String b = a.body.length() > 38 ? a.body.substring(0, 38) + "…" : a.body;
             JLabel bl = new JLabel(b); bl.setFont(Theme.FONT_TINY); bl.setForeground(new Color(255, 255, 255, 120));
             content.add(tl); content.add(bl);
@@ -548,7 +584,7 @@ public class DashboardPanel extends JPanel {
             ci[0]++;
         });
 
-        if (DataStore.ANNOUNCEMENTS.isEmpty()) {
+        if (DataStore.ANNOUNCEMENTS.stream().noneMatch(a -> user.isFaculty() || "ALL".equalsIgnoreCase(a.department) || a.department.equalsIgnoreCase(user.department))) {
             JLabel empty = new JLabel("No announcements");
             empty.setFont(Theme.FONT_SMALL); empty.setForeground(new Color(255, 255, 255, 80));
             list.add(empty);
@@ -562,7 +598,7 @@ public class DashboardPanel extends JPanel {
     private void showAnnouncementDetail(DataStore.Announcement a, Color tagColor) {
         javax.swing.JDialog dlg = new javax.swing.JDialog(
             (java.awt.Frame) javax.swing.SwingUtilities.getWindowAncestor(this), a.title, true);
-        dlg.setSize(560, 420); dlg.setLocationRelativeTo(this);
+        dlg.setSize(600, 440); dlg.setLocationRelativeTo(this);
 
         javax.swing.JPanel root = new javax.swing.JPanel(new java.awt.BorderLayout());
         root.setBackground(Theme.BG_CARD);
@@ -581,7 +617,7 @@ public class DashboardPanel extends JPanel {
         javax.swing.JLabel tagLbl = Theme.chip("  " + (a.tag!=null?a.tag.toUpperCase():"") + "  ",
             java.awt.Color.WHITE, new java.awt.Color(255,255,255,50));
         javax.swing.JLabel titleLbl = new javax.swing.JLabel(a.title);
-        titleLbl.setFont(new Font("SansSerif", Font.BOLD, 20)); titleLbl.setForeground(java.awt.Color.WHITE);
+        titleLbl.setFont(new Font("SansSerif", Font.BOLD, 22)); titleLbl.setForeground(java.awt.Color.WHITE);
         javax.swing.JPanel bandTop = new javax.swing.JPanel(new java.awt.BorderLayout()); bandTop.setOpaque(false);
         bandTop.add(tagLbl, java.awt.BorderLayout.WEST);
         javax.swing.JLabel meta = new javax.swing.JLabel((a.date!=null?a.date:"") + "  by " + a.postedBy);
@@ -593,7 +629,7 @@ public class DashboardPanel extends JPanel {
         javax.swing.JTextArea body = new javax.swing.JTextArea(a.body);
         body.setEditable(false); body.setLineWrap(true); body.setWrapStyleWord(true);
         body.setBackground(Theme.BG_CARD); body.setForeground(Theme.TEXT_DARK);
-        body.setFont(new Font("SansSerif", Font.PLAIN, 17));
+        body.setFont(new Font("SansSerif", Font.PLAIN, 18));
         body.setBorder(javax.swing.BorderFactory.createEmptyBorder(20, 24, 20, 24));
         body.setCaretColor(Theme.BG_CARD);
         javax.swing.JScrollPane sp = new javax.swing.JScrollPane(body);
@@ -612,7 +648,7 @@ public class DashboardPanel extends JPanel {
     private void showEventDetail(DataStore.Event ev, Color accent) {
         javax.swing.JDialog dlg = new javax.swing.JDialog(
             (java.awt.Frame) javax.swing.SwingUtilities.getWindowAncestor(this), ev.title, true);
-        dlg.setSize(440, 320); dlg.setLocationRelativeTo(this);
+        dlg.setSize(480, 370); dlg.setLocationRelativeTo(this);
 
         javax.swing.JPanel root = new javax.swing.JPanel(new java.awt.BorderLayout());
         root.setBackground(Theme.BG_CARD);
@@ -630,7 +666,7 @@ public class DashboardPanel extends JPanel {
         javax.swing.JLabel catChip = Theme.chip(" " + ev.category.toUpperCase() + " ",
             java.awt.Color.WHITE, new java.awt.Color(255,255,255,50));
         javax.swing.JLabel titleLbl = new javax.swing.JLabel(ev.title);
-        titleLbl.setFont(new Font("SansSerif",Font.BOLD,21)); titleLbl.setForeground(java.awt.Color.WHITE);
+        titleLbl.setFont(new Font("SansSerif",Font.BOLD,20)); titleLbl.setForeground(java.awt.Color.WHITE);
         band.add(catChip, java.awt.BorderLayout.NORTH); band.add(titleLbl, java.awt.BorderLayout.SOUTH);
         root.add(band, java.awt.BorderLayout.NORTH);
 
@@ -657,13 +693,13 @@ public class DashboardPanel extends JPanel {
     private void addDetailRow(javax.swing.JPanel p, String label, String value, Color accent) {
         javax.swing.JPanel row = new javax.swing.JPanel(new java.awt.BorderLayout(10,0));
         row.setOpaque(false);
-        row.setMaximumSize(new java.awt.Dimension(Integer.MAX_VALUE, 36));
+        row.setMaximumSize(new java.awt.Dimension(Integer.MAX_VALUE, 42));
         row.setBorder(javax.swing.BorderFactory.createEmptyBorder(0,0,8,0));
         javax.swing.JLabel lbl = new javax.swing.JLabel(label);
-        lbl.setFont(Theme.font(Font.BOLD,15)); lbl.setForeground(Theme.TEXT_MUTE);
-        lbl.setPreferredSize(new java.awt.Dimension(110,24));
+        lbl.setFont(Theme.font(Font.BOLD,17)); lbl.setForeground(Theme.TEXT_MUTE);
+        lbl.setPreferredSize(new java.awt.Dimension(120,28));
         javax.swing.JLabel val = new javax.swing.JLabel(value);
-        val.setFont(Theme.font(Font.PLAIN,16)); val.setForeground(Theme.TEXT_DARK);
+        val.setFont(Theme.font(Font.PLAIN,17)); val.setForeground(Theme.TEXT_DARK);
         row.add(lbl, java.awt.BorderLayout.WEST); row.add(val, java.awt.BorderLayout.CENTER);
         row.setAlignmentX(LEFT_ALIGNMENT);
         p.add(row);
@@ -672,7 +708,7 @@ public class DashboardPanel extends JPanel {
     private void showNoteDetail(DataStore.Note n) {
         javax.swing.JDialog dlg = new javax.swing.JDialog(
             (java.awt.Frame) javax.swing.SwingUtilities.getWindowAncestor(this), n.fileName, true);
-        dlg.setSize(460, 320); dlg.setLocationRelativeTo(this);
+        dlg.setSize(500, 360); dlg.setLocationRelativeTo(this);
 
         javax.swing.JPanel root = new javax.swing.JPanel(new java.awt.BorderLayout());
         root.setBackground(Theme.BG_CARD);
@@ -690,7 +726,7 @@ public class DashboardPanel extends JPanel {
         band.setBorder(javax.swing.BorderFactory.createEmptyBorder(12,22,12,22));
         javax.swing.JLabel typeLbl = Theme.chip(" " + n.fileType + " ", java.awt.Color.WHITE, new java.awt.Color(255,255,255,50));
         javax.swing.JLabel nameLbl = new javax.swing.JLabel(n.fileName);
-        nameLbl.setFont(new Font("SansSerif",Font.BOLD,17)); nameLbl.setForeground(java.awt.Color.WHITE);
+        nameLbl.setFont(new Font("SansSerif",Font.BOLD,19)); nameLbl.setForeground(java.awt.Color.WHITE);
         band.add(typeLbl, java.awt.BorderLayout.NORTH); band.add(nameLbl, java.awt.BorderLayout.SOUTH);
         root.add(band, java.awt.BorderLayout.NORTH);
 

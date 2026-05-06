@@ -1,518 +1,378 @@
 package com.campusshare.ui;
 
+import java.awt.BasicStroke;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.GridLayout;
+import java.awt.Insets;
+import java.awt.RenderingHints;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.image.BufferedImage;
+import java.io.InputStream;
+import java.util.Objects;
+
+import javax.imageio.ImageIO;
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JPasswordField;
+import javax.swing.JTextField;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+
 import com.campusshare.data.DataStore;
 import com.campusshare.remote.CredentialStore;
-import javax.swing.*;
-import javax.swing.border.*;
-import java.awt.*;
-import java.awt.event.*;
-import java.awt.geom.*;
-import java.util.Random;
 
+/**
+ * Login / Sign-Up window.
+ * Full-width building image. Minimal dark overlay only on the right half for card contrast.
+ * Card width balanced for content. No department chips in branding.
+ * Faculty signup now includes Department selection.
+ */
 public class LoginWindow extends JFrame {
 
-    private final float[] starX, starY, starR, starAlpha;
-    private float phase1 = 0f, phase2 = 0f;
     private final Runnable onLoginSuccess;
 
-    private boolean isSignUp = false;
-    private JPanel cardHolder;   // swapped on toggle
-
-    private JTextField    emailField;
+    private JTextField     emailField;
     private JPasswordField passField;
-    private JTextField    nameField;
+    private JTextField     nameField;
+    private JComboBox<String> roleBox;
     private JComboBox<String> deptBox;
-    private JLabel        errorLabel;
+    private JComboBox<String> semBox;
+    private JLabel         errorLabel;
+
+    private static BufferedImage BG_IMAGE;
+    static {
+        try (InputStream is = LoginWindow.class.getResourceAsStream("/login_bg.png")) {
+            if (is != null) BG_IMAGE = ImageIO.read(is);
+        } catch (Exception ignored) {}
+    }
+
+    private JTextField studentIdField;
+
+    private static final Color CARD_BG     = new Color(8, 18, 40, 228);
+    private static final Color CARD_BORDER = new Color(74, 127, 193, 90);
+    private static final Color ACCENT      = new Color(91, 155, 213);
+    private static final Color ACCENT_LT   = new Color(143, 196, 240);
 
     public LoginWindow(Runnable onLoginSuccess) {
-        super("CampusShare \u2014 Sign In");
+        super("CampusShare — Sign In");
         this.onLoginSuccess = onLoginSuccess;
-
-        // Resizable, decorated window
-        setSize(900, 660);
-        setMinimumSize(new Dimension(720, 520));
+        setSize(1060, 760);
+        setMinimumSize(new Dimension(820, 640));
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setContentPane(buildRoot());
+    }
 
-        // Stars
-        Random rng = new Random(42);
-        int N = 120;
-        starX = new float[N]; starY = new float[N];
-        starR = new float[N]; starAlpha = new float[N];
-        for (int i = 0; i < N; i++) {
-            starX[i] = rng.nextFloat(); starY[i] = rng.nextFloat();
-            starR[i] = 0.5f + rng.nextFloat() * 1.5f;
-            starAlpha[i] = 0.3f + rng.nextFloat() * 0.7f;
-        }
-
-        // Root: left space panel + right card panel, split 55/45
-        JPanel root = new JPanel(new GridLayout(1, 2, 0, 0)) {
+    // ── Root: full-window image, branding bottom-left, card right ────────────
+    private JPanel buildRoot() {
+        JPanel root = new JPanel(new BorderLayout()) {
             @Override protected void paintComponent(Graphics g) {
-                paintSpace((Graphics2D) g, getWidth(), getHeight());
+                super.paintComponent(g);
+                paintBg((Graphics2D) g, getWidth(), getHeight());
             }
         };
         root.setOpaque(true);
 
-        // Left: space branding panel (transparent, drawn by root)
-        JPanel leftPanel = new JPanel(new BorderLayout());
-        leftPanel.setOpaque(false);
+        // LEFT — branding bottom-left
+        JPanel left = new JPanel(new BorderLayout());
+        left.setOpaque(false);
 
-        // No logo on login/signup screen
+        JPanel branding = new JPanel();
+        branding.setLayout(new BoxLayout(branding, BoxLayout.Y_AXIS));
+        branding.setOpaque(false);
+        branding.setBorder(BorderFactory.createEmptyBorder(0, 40, 52, 20));
 
-        // Hero text bottom-left
-        JPanel heroArea = new JPanel();
-        heroArea.setLayout(new BoxLayout(heroArea, BoxLayout.Y_AXIS));
-        heroArea.setOpaque(false);
-        heroArea.setBorder(BorderFactory.createEmptyBorder(0, 28, 48, 20));
+        JLabel name = new JLabel("CampusShare");
+        name.setFont(new Font("SansSerif", Font.BOLD, 44));
+        name.setForeground(Color.WHITE);
+        name.setAlignmentX(LEFT_ALIGNMENT);
 
-        JLabel tagline = new JLabel("SIGN IN TO YOUR");
-        tagline.setFont(new Font("SansSerif", Font.PLAIN, 15));
-        tagline.setForeground(new Color(255, 255, 255, 160));
-        tagline.setAlignmentX(LEFT_ALIGNMENT);
+        JLabel tag = new JLabel("Campus. Connected.");
+        tag.setFont(new Font("SansSerif", Font.PLAIN, 28));
+        tag.setForeground(new Color(255, 255, 255, 190));
+        tag.setAlignmentX(LEFT_ALIGNMENT);
 
-        JLabel headline = new JLabel("<html>CAMPUS<br>ADVENTURE!</html>");
-        headline.setFont(new Font("SansSerif", Font.BOLD, 38));
-        headline.setForeground(Color.WHITE);
-        headline.setAlignmentX(LEFT_ALIGNMENT);
+        branding.add(name);
+        branding.add(Box.createVerticalStrut(6));
+        branding.add(tag);
+        left.add(branding, BorderLayout.SOUTH);
 
-        JLabel caption = new JLabel("Your campus, connected.");
-        caption.setFont(new Font("SansSerif", Font.PLAIN, 15));
-        caption.setForeground(new Color(255, 255, 255, 100));
-        caption.setAlignmentX(LEFT_ALIGNMENT);
-
-        heroArea.add(tagline);
-        heroArea.add(Box.createVerticalStrut(6));
-        heroArea.add(headline);
-        heroArea.add(Box.createVerticalStrut(10));
-        heroArea.add(caption);
-        leftPanel.add(heroArea, BorderLayout.SOUTH);
-
-        root.add(leftPanel);
-
-        // Right: glass card, centred
-        JPanel rightPanel = new JPanel(new GridBagLayout());
-        rightPanel.setOpaque(false);
-        rightPanel.setBorder(BorderFactory.createEmptyBorder(20, 12, 20, 24));
-        cardHolder = buildLoginCard();
-        rightPanel.add(cardHolder, new GridBagConstraints());
-        root.add(rightPanel);
-
-        setContentPane(root);
-
-        // Animation
-        animTimer = new Timer(40, e -> {
-            phase1 += 0.018f; phase2 += 0.022f;
-            for (int i = 0; i < starAlpha.length; i++) {
-                starAlpha[i] += (float)(Math.random() * 0.05 - 0.025);
-                starAlpha[i] = Math.max(0.05f, Math.min(1f, starAlpha[i]));
-            }
-            root.repaint();
-        });
-        animTimer.start();
-    }
-
-    // \u2500\u2500 Logo widget \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-    private JPanel buildLogoWidget() {
-        JPanel p = new JPanel(null) {
-            @Override public Dimension getPreferredSize() { return new Dimension(220, 36); }
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                int cx=16, cy=16, r=13;
-                int[] xs=new int[6], ys=new int[6];
-                for(int i=0;i<6;i++){
-                    double a=Math.toRadians(60*i-30);
-                    xs[i]=cx+(int)(r*Math.cos(a)); ys[i]=cy+(int)(r*Math.sin(a));
-                }
-                g2.setPaint(new GradientPaint(cx-r,cy-r,new Color(0x6366F1),cx+r,cy+r,new Color(0xA78BFA)));
-                g2.fillPolygon(xs,ys,6);
-                g2.setColor(new Color(196,181,253,120));
-                g2.setStroke(new BasicStroke(1.5f));
-                g2.drawPolygon(xs,ys,6);
-                g2.setColor(Color.WHITE);
-                Font bf = new Font("SansSerif",Font.BOLD,16);
-                g2.setFont(bf);
-                FontMetrics fm=g2.getFontMetrics();
-                g2.drawString("C",cx-fm.stringWidth("C")/2,cy+fm.getAscent()/2-1);
-                g2.setFont(new Font("SansSerif",Font.BOLD,18));
-                fm = g2.getFontMetrics();
-                g2.setColor(Color.WHITE); g2.drawString("Campus",38,22);
-                int cw = fm.stringWidth("Campus");
-                g2.setColor(new Color(0xC4B5FD)); g2.drawString("Share",38+cw+2,22);
-                g2.dispose();
+        // RIGHT — card wrapper (width reduced: 680 → 520)
+        JPanel rightWrap = new JPanel(new GridBagLayout()) {
+            @Override public Dimension getPreferredSize() {
+                return new Dimension(560, super.getPreferredSize().height);
             }
         };
-        p.setOpaque(false);
-        return p;
+        rightWrap.setOpaque(false);
+        rightWrap.setBorder(BorderFactory.createEmptyBorder(24, 12, 24, 40));
+        rightWrap.add(buildLoginCard(), new GridBagConstraints());
+
+        root.add(left, BorderLayout.CENTER);
+        root.add(rightWrap, BorderLayout.EAST);
+        return root;
     }
 
-    // \u2500\u2500 Space background \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-    private void paintSpace(Graphics2D g2, int w, int h) {
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2.setPaint(new GradientPaint(0,0,Theme.SPACE_1,w,h,Theme.SPACE_4));
-        g2.fillRect(0,0,w,h);
-        for (int i=0;i<starX.length;i++){
-            g2.setColor(new Color(1f,1f,1f,starAlpha[i]));
-            float x=starX[i]*w, sy=starY[i]*h, r=starR[i];
-            g2.fill(new Ellipse2D.Float(x-r,sy-r,r*2,r*2));
+    private void paintBg(Graphics2D g2, int w, int h) {
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        if (BG_IMAGE != null) {
+            double ir = (double) BG_IMAGE.getWidth() / BG_IMAGE.getHeight();
+            double pr = (double) w / h;
+            int dw, dh, ox, oy;
+            if (ir > pr) { dh = h; dw = (int)(h * ir); ox = (w - dw) / 2; oy = 0; }
+            else          { dw = w; dh = (int)(w / ir); ox = 0; oy = (h - dh) / 2; }
+            g2.drawImage(BG_IMAGE, ox, oy, dw, dh, null);
+        } else {
+            g2.setColor(new Color(10, 20, 50)); g2.fillRect(0, 0, w, h);
         }
-        float p1y=(float)(Math.sin(phase1)*12);
-        float p2y=(float)(Math.sin(phase2)*8);
-        float p3y=(float)(Math.sin(phase1+1f)*10);
-        int lw = w/2; // planets stay on left half
-        paintPlanet(g2,(int)(lw*0.38),(int)(h*0.2+p1y),   (int)(lw*0.35), new Color(0x6B21C8),new Color(0x2E0B5E),new Color(0x110435));
-        paintPlanet(g2,(int)(lw*0.6), (int)(h*0.55+p2y),  (int)(lw*0.17), new Color(0x9B59B6),new Color(0x4A235A),new Color(0x1E0B2E));
-        paintPlanet(g2,(int)(lw*0.12),(int)(h*0.75+p3y),  (int)(lw*0.18), new Color(0x3B82F6),new Color(0x1D4ED8),new Color(0x0D2563));
+        // Very light vignette on LEFT — preserve image clarity
+        g2.setPaint(new java.awt.GradientPaint(0, h*2/3, new Color(0,0,0,0), 0, h, new Color(0,0,0,120)));
+        g2.fillRect(0, 0, w/2, h);
     }
 
-    private void paintPlanet(Graphics2D g2, int cx, int cy, int r, Color c1, Color c2, Color c3) {
-        g2.setPaint(new RadialGradientPaint(
-            new Point2D.Float(cx-r*0.3f,cy-r*0.3f),r,
-            new float[]{0f,0.6f,1f}, new Color[]{c1,c2,c3}));
-        g2.fillOval(cx-r,cy-r,r*2,r*2);
-        g2.setColor(new Color(0,0,0,50));
-        g2.drawOval(cx-r,cy-r,r*2,r*2);
-        // Shimmer
-        g2.setPaint(new RadialGradientPaint(
-            new Point2D.Float(cx-r*0.4f,cy-r*0.4f),r*0.6f,
-            new float[]{0f,1f}, new Color[]{new Color(255,255,255,60),new Color(255,255,255,0)}));
-        g2.fillOval((int)(cx-r*0.75),(int)(cy-r*0.75),(int)(r*1.1),(int)(r*1.1));
-    }
-
-    // \u2500\u2500 Glass card builder \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    // ── Cards ────────────────────────────────────────────────────────────────
     private JPanel buildLoginCard() {
-        JPanel card = new JPanel(new GridBagLayout()) {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(new Color(15,8,50,210));
-                g2.fillRoundRect(0,0,getWidth(),getHeight(),20,20);
-                g2.setColor(new Color(140,100,255,60));
-                g2.setStroke(new BasicStroke(1.2f));
-                g2.drawRoundRect(0,0,getWidth()-1,getHeight()-1,20,20);
-                g2.dispose();
-                super.paintComponent(g);
-            }
-        };
-        card.setOpaque(false);
-        card.setPreferredSize(new Dimension(340, 440));
+        JPanel card = makeCard(400);
+        GridBagConstraints gc = gc();
 
-        GridBagConstraints gc = new GridBagConstraints();
-        gc.gridx=0; gc.fill=GridBagConstraints.HORIZONTAL; gc.weightx=1;
-        gc.insets=new Insets(0,28,0,28);
+        logoRow(card, gc);
+        addTitle(card, gc, "Happy return", "Sign in to your account");
 
-        // Title
-        JLabel title = new JLabel("Welcome Back");
-        title.setFont(new Font("SansSerif",Font.BOLD,26)); title.setForeground(Color.WHITE);
-        title.setHorizontalAlignment(SwingConstants.CENTER);
-        gc.gridy=0; gc.insets=new Insets(28,28,4,28);
-        card.add(title, gc);
+        row(card, gc, "Email Address");
+        emailField = field("student@campus.edu"); add(card, gc, emailField, 12);
 
-        JLabel sub = new JLabel("Sign in to CampusShare");
-        sub.setFont(Theme.font(Font.PLAIN,15)); sub.setForeground(new Color(255,255,255,140));
-        sub.setHorizontalAlignment(SwingConstants.CENTER);
-        gc.gridy=1; gc.insets=new Insets(0,28,20,28);
-        card.add(sub, gc);
+        row(card, gc, "Password");
+        passField = pass("Enter your password"); add(card, gc, passField, 8);
 
-        // Email
-        gc.insets=new Insets(0,28,6,28);
-        JLabel emailLbl = makeFieldLabel("Email Address");
-        gc.gridy=2; card.add(emailLbl, gc);
-        emailField = makeTextField("student@campus.edu");
-        gc.gridy=3; gc.insets=new Insets(0,28,14,28);
-        card.add(emailField, gc);
+        errorLabel = errLabel(); add(card, gc, errorLabel, 4);
 
-        // Password
-        gc.insets=new Insets(0,28,6,28);
-        JLabel passLbl = makeFieldLabel("Password");
-        gc.gridy=4; card.add(passLbl, gc);
-        passField = makePasswordField("Enter your password");
-        gc.gridy=5; gc.insets=new Insets(0,28,8,28);
-        card.add(passField, gc);
-
-        // Error label
-        errorLabel = new JLabel(" ");
-        errorLabel.setFont(Theme.font(Font.PLAIN,14));
-        errorLabel.setForeground(new Color(252,165,165));
-        errorLabel.setHorizontalAlignment(SwingConstants.CENTER);
-        gc.gridy=6; gc.insets=new Insets(0,28,6,28);
-        card.add(errorLabel, gc);
-
-        // Login button
-        JButton loginBtn = buildPrimaryButton("Sign In");
-        loginBtn.addActionListener(e -> doLogin());
+        JButton btn = btn("Sign In"); btn.addActionListener(e -> doLogin());
         passField.addActionListener(e -> doLogin());
-        gc.gridy=7; gc.insets=new Insets(0,28,14,28);
-        card.add(loginBtn, gc);
+        add(card, gc, btn, 16);
 
-        // Toggle to sign up
-        JPanel toggle = new JPanel(new FlowLayout(FlowLayout.CENTER,4,0));
-        toggle.setOpaque(false);
-        JLabel noAcct = new JLabel("Don't have an account?");
-        noAcct.setFont(Theme.font(Font.PLAIN,14)); noAcct.setForeground(new Color(255,255,255,140));
-        JLabel signUpLink = new JLabel("Sign Up");
-        signUpLink.setFont(Theme.font(Font.BOLD,14)); signUpLink.setForeground(new Color(0xA78BFA));
-        signUpLink.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        signUpLink.addMouseListener(new MouseAdapter(){
-            public void mousePressed(MouseEvent e){ switchToSignUp(); }
-        });
-        toggle.add(noAcct); toggle.add(signUpLink);
-        gc.gridy=8; gc.insets=new Insets(0,28,24,28);
-        card.add(toggle, gc);
-
+        add(card, gc, toggleRow("Don't have an account?", "Sign Up", () -> swap(buildSignUpCard(), "Sign Up")), 24);
         return card;
     }
 
     private JPanel buildSignUpCard() {
-        JPanel card = new JPanel(new GridBagLayout()) {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(new Color(15,8,50,210));
-                g2.fillRoundRect(0,0,getWidth(),getHeight(),20,20);
-                g2.setColor(new Color(140,100,255,60));
-                g2.setStroke(new BasicStroke(1.2f));
-                g2.drawRoundRect(0,0,getWidth()-1,getHeight()-1,20,20);
-                g2.dispose();
-                super.paintComponent(g);
-            }
-        };
-        card.setOpaque(false);
-        card.setPreferredSize(new Dimension(340, 500));
+        // Height adjusted: 660 to fit ID field + proper button height
+        JPanel card = makeCard(660);
+        GridBagConstraints gc = gc();
+        logoRow(card, gc);
+        addTitle(card, gc, "Create Account", "Join your campus");
 
-        GridBagConstraints gc = new GridBagConstraints();
-        gc.gridx=0; gc.fill=GridBagConstraints.HORIZONTAL; gc.weightx=1;
+        // Role selector: Student or Faculty
+        row(card, gc, "I am a");
+        roleBox = combo(new String[]{"Student","Faculty"});
+        // same height as all inputs
+        add(card, gc, roleBox, 12);
 
-        JLabel title = new JLabel("Create Account");
-        title.setFont(new Font("SansSerif",Font.BOLD,26)); title.setForeground(Color.WHITE);
-        title.setHorizontalAlignment(SwingConstants.CENTER);
-        gc.gridy=0; gc.insets=new Insets(28,28,4,28); card.add(title,gc);
+        // Name + Dept row
+        row(card, gc, "Full Name  /  Department");
+        JPanel r1 = new JPanel(new GridLayout(1,2,8,0)); r1.setOpaque(false);
+        nameField = field("Full name");
+        deptBox   = combo(new String[]{"CSE","EEE","BBA","Law","English","Mathematics"});
+        r1.add(nameField); r1.add(deptBox);
+        add(card, gc, r1, 10);
 
-        JLabel sub = new JLabel("Join CampusShare today");
-        sub.setFont(Theme.font(Font.PLAIN,15)); sub.setForeground(new Color(255,255,255,140));
-        sub.setHorizontalAlignment(SwingConstants.CENTER);
-        gc.gridy=1; gc.insets=new Insets(0,28,18,28); card.add(sub,gc);
+        // Email
+        row(card, gc, "Email Address");
+        emailField = field("you@campus.edu"); add(card, gc, emailField, 10);
 
-        gc.insets=new Insets(0,28,6,28);
-        gc.gridy=2; card.add(makeFieldLabel("Full Name"),gc);
-        nameField = makeTextField("Your full name");
-        gc.gridy=3; gc.insets=new Insets(0,28,12,28); card.add(nameField,gc);
+        // Student / Employee ID
+        row(card, gc, "Student / Employee ID");
+        studentIdField = field("e.g. 2021-CSE-001"); add(card, gc, studentIdField, 10);
 
-        gc.insets=new Insets(0,28,6,28);
-        gc.gridy=4; card.add(makeFieldLabel("Email Address"),gc);
-        emailField = makeTextField("student@campus.edu");
-        gc.gridy=5; gc.insets=new Insets(0,28,12,28); card.add(emailField,gc);
+        // Semester + Password  (semester hidden for Faculty)
+        JPanel semRow = new JPanel(new GridLayout(1,2,8,0)); semRow.setOpaque(false);
+        semBox    = combo(new String[]{"1","2","3","4","5","6","7","8"});
+        passField = pass("Choose a password");
+        semRow.add(semBox); semRow.add(passField);
 
-        gc.insets=new Insets(0,28,6,28);
-        gc.gridy=6; card.add(makeFieldLabel("Department"),gc);
-        deptBox = new JComboBox<>(new String[]{"CSE","EEE","BBA","Law","English","Mathematics"});
-        styleCombo(deptBox);
-        gc.gridy=7; gc.insets=new Insets(0,28,12,28); card.add(deptBox,gc);
+        JLabel semRowLabel = lbl("Semester  /  Password");
+        gc.gridy++; gc.insets = new Insets(0,28,4,28);
+        card.add(semRowLabel, gc);
+        gc.gridy++; gc.insets = new Insets(0,28,10,28);
+        card.add(semRow, gc);
 
-        gc.insets=new Insets(0,28,6,28);
-        gc.gridy=8; card.add(makeFieldLabel("Password"),gc);
-        passField = makePasswordField("Choose a password");
-        gc.gridy=9; gc.insets=new Insets(0,28,8,28); card.add(passField,gc);
-
-        errorLabel = new JLabel(" ");
-        errorLabel.setFont(Theme.font(Font.PLAIN,14));
-        errorLabel.setForeground(new Color(252,165,165));
-        errorLabel.setHorizontalAlignment(SwingConstants.CENTER);
-        gc.gridy=10; gc.insets=new Insets(0,28,6,28); card.add(errorLabel,gc);
-
-        JButton btn = buildPrimaryButton("Create Account");
-        btn.addActionListener(e -> doSignUp());
-        gc.gridy=11; gc.insets=new Insets(0,28,12,28); card.add(btn,gc);
-
-        JPanel toggle = new JPanel(new FlowLayout(FlowLayout.CENTER,4,0));
-        toggle.setOpaque(false);
-        JLabel has = new JLabel("Already have an account?");
-        has.setFont(Theme.font(Font.PLAIN,14)); has.setForeground(new Color(255,255,255,140));
-        JLabel signInLink = new JLabel("Sign In");
-        signInLink.setFont(Theme.font(Font.BOLD,14)); signInLink.setForeground(new Color(0xA78BFA));
-        signInLink.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        signInLink.addMouseListener(new MouseAdapter(){
-            public void mousePressed(MouseEvent e){ switchToLogin(); }
+        // Hide semester picker for Faculty selection
+        roleBox.addActionListener(e -> {
+            boolean isFac = "Faculty".equals(roleBox.getSelectedItem());
+            semRow.getComponent(0).setVisible(!isFac);   // semBox
+            semRowLabel.setText(isFac ? "Password" : "Semester  /  Password");
         });
-        toggle.add(has); toggle.add(signInLink);
-        gc.gridy=12; gc.insets=new Insets(0,28,22,28); card.add(toggle,gc);
 
+        errorLabel = errLabel(); add(card, gc, errorLabel, 4);
+
+        JButton btn = btn("Create Account"); btn.addActionListener(e -> doSignUp());
+        passField.addActionListener(e -> doSignUp());
+        add(card, gc, btn, 12);
+        add(card, gc, toggleRow("Already have an account?", "Sign In", () -> swap(buildLoginCard(), "Sign In")), 20);
         return card;
     }
 
-    // \u2500\u2500 Field helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-    private JLabel makeFieldLabel(String text) {
-        JLabel l = new JLabel(text);
-        l.setFont(Theme.font(Font.BOLD,14));
-        l.setForeground(new Color(255,255,255,180));
-        return l;
+    private void swap(JPanel newCard, String title) {
+        JPanel root  = (JPanel) getContentPane();
+        JPanel right = (JPanel) ((BorderLayout) root.getLayout()).getLayoutComponent(BorderLayout.EAST);
+        right.removeAll();
+        GridBagConstraints gc = new GridBagConstraints(); gc.insets = new Insets(0,0,0,0);
+        right.add(newCard, gc);
+        right.revalidate(); right.repaint();
+        setTitle("CampusShare — " + title);
     }
 
-    private JTextField makeTextField(String placeholder) {
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    private JPanel makeCard(int h) {
+        JPanel c = new JPanel(new GridBagLayout()) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(CARD_BG); g2.fillRoundRect(0,0,getWidth(),getHeight(),22,22);
+                g2.setColor(CARD_BORDER); g2.setStroke(new BasicStroke(1.5f));
+                g2.drawRoundRect(0,0,getWidth()-1,getHeight()-1,22,22);
+                g2.setColor(ACCENT); g2.setStroke(new BasicStroke(2.8f));
+                g2.drawLine(44,0,getWidth()-44,0);
+                g2.dispose(); super.paintComponent(g);
+            }
+        };
+        c.setOpaque(false);
+        // Width fixed; height is a minimum — let the card grow to fit all fields naturally
+        c.setPreferredSize(new Dimension(500, h));
+        c.setMinimumSize(new Dimension(460, h));
+        return c;
+    }
+    private GridBagConstraints gc() {
+        GridBagConstraints g = new GridBagConstraints();
+        g.gridx=0; g.fill=GridBagConstraints.HORIZONTAL; g.weightx=1; g.gridy=-1; return g;
+    }
+    private void logoRow(JPanel card, GridBagConstraints gc) {
+        // logo removed — minimal top padding only
+        gc.gridy++; gc.insets=new Insets(4,28,0,28);
+    }
+    private void addTitle(JPanel card, GridBagConstraints gc, String t1, String t2) {
+        JLabel a = new JLabel(t1); a.setFont(new Font("SansSerif",Font.BOLD,30)); a.setForeground(Color.WHITE); a.setHorizontalAlignment(SwingConstants.CENTER);
+        gc.gridy++; gc.insets=new Insets(0,28,4,28); card.add(a,gc);
+        JLabel b = new JLabel(t2); b.setFont(new Font("SansSerif",Font.PLAIN,17)); b.setForeground(new Color(255,255,255,120)); b.setHorizontalAlignment(SwingConstants.CENTER);
+        gc.gridy++; gc.insets=new Insets(0,28,20,28); card.add(b,gc);
+    }
+    private JLabel lbl(String t) { JLabel l=new JLabel(t); l.setFont(new Font("SansSerif",Font.BOLD,16)); l.setForeground(new Color(255,255,255,175)); return l; }
+    private void row(JPanel card, GridBagConstraints gc, String text) {
+        gc.gridy++; gc.insets=new Insets(0,28,5,28); card.add(lbl(text),gc);
+    }
+    private void add(JPanel card, GridBagConstraints gc, Component c, int bottomGap) {
+        gc.gridy++; gc.insets=new Insets(0,28,bottomGap,28); card.add(c,gc);
+    }
+    private JTextField field(String ph) {
         JTextField f = new JTextField() {
             @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2=(Graphics2D)g.create();
-                g2.setColor(new Color(255,255,255,18));
-                g2.fillRoundRect(0,0,getWidth(),getHeight(),8,8);
-                g2.dispose(); super.paintComponent(g);
-                if(getText().isEmpty()&&!isFocusOwner()){
-                    g2=( Graphics2D)g.create();
-                    g2.setColor(new Color(255,255,255,60));
-                    g2.setFont(getFont());
-                    Insets ins=getInsets();
-                    FontMetrics fm=g2.getFontMetrics();
-                    g2.drawString(placeholder,ins.left+2,(getHeight()+fm.getAscent()-fm.getDescent())/2);
-                    g2.dispose();
-                }
+                Graphics2D g2=(Graphics2D)g.create(); g2.setColor(new Color(255,255,255,14)); g2.fillRoundRect(0,0,getWidth(),getHeight(),8,8); g2.dispose();
+                super.paintComponent(g);
+                if (getText().isEmpty()&&!isFocusOwner()) { Graphics2D g3=(Graphics2D)g.create(); g3.setColor(new Color(255,255,255,50)); g3.setFont(getFont()); Insets ins=getInsets(); FontMetrics fm=g3.getFontMetrics(); g3.drawString(ph,ins.left+2,(getHeight()+fm.getAscent()-fm.getDescent())/2); g3.dispose(); }
             }
         };
-        styleInput(f);
-        return f;
+        styleInput(f); return f;
     }
-
-    private JPasswordField makePasswordField(String placeholder) {
+    private JPasswordField pass(String ph) {
         JPasswordField f = new JPasswordField() {
             @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2=(Graphics2D)g.create();
-                g2.setColor(new Color(255,255,255,18));
-                g2.fillRoundRect(0,0,getWidth(),getHeight(),8,8);
-                g2.dispose(); super.paintComponent(g);
-                if(getPassword().length==0&&!isFocusOwner()){
-                    g2=(Graphics2D)g.create();
-                    g2.setColor(new Color(255,255,255,60));
-                    g2.setFont(getFont());
-                    Insets ins=getInsets();
-                    FontMetrics fm=g2.getFontMetrics();
-                    g2.drawString(placeholder,ins.left+2,(getHeight()+fm.getAscent()-fm.getDescent())/2);
-                    g2.dispose();
-                }
+                Graphics2D g2=(Graphics2D)g.create(); g2.setColor(new Color(255,255,255,14)); g2.fillRoundRect(0,0,getWidth(),getHeight(),8,8); g2.dispose();
+                super.paintComponent(g);
+                if (getPassword().length==0&&!isFocusOwner()) { Graphics2D g3=(Graphics2D)g.create(); g3.setColor(new Color(255,255,255,50)); g3.setFont(getFont()); Insets ins=getInsets(); FontMetrics fm=g3.getFontMetrics(); g3.drawString(ph,ins.left+2,(getHeight()+fm.getAscent()-fm.getDescent())/2); g3.dispose(); }
             }
         };
-        styleInput(f);
-        f.setEchoChar('\u2022');
-        return f;
+        styleInput(f); f.setEchoChar('•'); return f;
     }
-
+    private JComboBox<String> combo(String[] items) {
+        JComboBox<String> c = new JComboBox<>(items);
+        c.setBackground(new Color(12,24,52)); c.setForeground(Color.WHITE);
+        c.setFont(new Font("SansSerif",Font.PLAIN,17));
+        c.setBorder(new RoundBorder(8,new Color(74,127,193,90),1));
+        c.setPreferredSize(new Dimension(0,46)); return c;
+    }
     private void styleInput(JTextField f) {
         f.setOpaque(false);
-        f.setBorder(BorderFactory.createCompoundBorder(
-            new RoundBorder(8,new Color(140,100,255,80),1),
-            BorderFactory.createEmptyBorder(8,12,8,12)));
-        f.setForeground(Color.WHITE); f.setCaretColor(Color.WHITE);
-        f.setFont(Theme.font(Font.PLAIN,16));
-        f.setPreferredSize(new Dimension(0,38));
+        f.setBorder(BorderFactory.createCompoundBorder(new RoundBorder(8,new Color(74,127,193,90),1), BorderFactory.createEmptyBorder(8,12,8,12)));
+        f.setForeground(Color.WHITE); f.setCaretColor(ACCENT_LT);
+        f.setFont(new Font("SansSerif",Font.PLAIN,17)); f.setPreferredSize(new Dimension(0,46));
     }
-
-    private void styleCombo(JComboBox<String> c) {
-        c.setBackground(new Color(30,20,80));
-        c.setForeground(Color.WHITE);
-        c.setFont(Theme.font(Font.PLAIN,16));
-        c.setBorder(new RoundBorder(8,new Color(140,100,255,80),1));
-        c.setPreferredSize(new Dimension(0,38));
-    }
-
-    private JButton buildPrimaryButton(String text) {
+    private JButton btn(String text) {
         JButton b = new JButton(text) {
             @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2=(Graphics2D)g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
-                Color bg = getModel().isRollover() ? new Color(0x4F46E5) : new Color(0x6366F1);
-                g2.setColor(bg); g2.fillRoundRect(0,0,getWidth(),getHeight(),10,10);
-                g2.setColor(Color.WHITE); g2.setFont(Theme.font(Font.BOLD,16));
-                FontMetrics fm=g2.getFontMetrics();
-                g2.drawString(getText(),(getWidth()-fm.stringWidth(getText()))/2,(getHeight()+fm.getAscent()-fm.getDescent())/2);
-                g2.dispose();
+                Graphics2D g2=(Graphics2D)g.create(); g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
+                Color bg=getModel().isRollover()?new Color(74,138,196):ACCENT;
+                g2.setPaint(new java.awt.GradientPaint(0,0,bg.brighter(),0,getHeight(),bg));
+                g2.fillRoundRect(0,0,getWidth(),getHeight(),10,10);
+                g2.setColor(Color.WHITE); g2.setFont(new Font("SansSerif",Font.BOLD,20));
+                FontMetrics fm=g2.getFontMetrics(); g2.drawString(getText(),(getWidth()-fm.stringWidth(getText()))/2,(getHeight()+fm.getAscent()-fm.getDescent())/2); g2.dispose();
             }
         };
-        b.setPreferredSize(new Dimension(0,42));
-        b.setOpaque(false); b.setContentAreaFilled(false);
-        b.setBorderPainted(false); b.setFocusPainted(false);
-        b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        return b;
+        b.setPreferredSize(new Dimension(0,54)); b.setOpaque(false); b.setContentAreaFilled(false);
+        b.setBorderPainted(false); b.setFocusPainted(false); b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)); return b;
+    }
+    private JLabel errLabel() {
+        JLabel l=new JLabel(" "); l.setFont(new Font("SansSerif",Font.PLAIN,15));
+        l.setForeground(new Color(252,165,165)); l.setHorizontalAlignment(SwingConstants.CENTER); return l;
+    }
+    private JPanel toggleRow(String msg, String link, Runnable action) {
+        JPanel w=new JPanel(); w.setOpaque(false);
+        JPanel inner=new JPanel(new FlowLayout(FlowLayout.CENTER,4,0)); inner.setOpaque(false);
+        JLabel m=new JLabel(msg); m.setFont(new Font("SansSerif",Font.PLAIN,16)); m.setForeground(new Color(255,255,255,120));
+        JLabel l=new JLabel(link); l.setFont(new Font("SansSerif",Font.BOLD,16)); l.setForeground(ACCENT_LT); l.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        l.addMouseListener(new MouseAdapter(){ public void mousePressed(MouseEvent e){ action.run(); } });
+        inner.add(m); inner.add(l); w.add(inner); return w;
     }
 
-    // \u2500\u2500 Actions \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    // ── Actions ──────────────────────────────────────────────────────────────
     private void doLogin() {
-        if (errorLabel == null) return;
-        String email = emailField.getText().trim();
-        String pass  = new String(passField.getPassword());
-        if (email.isEmpty() || pass.isEmpty()) { errorLabel.setText("Please fill in all fields."); return; }
-        if (isSignUp) {
-            String name = nameField != null ? nameField.getText().trim() : "";
-            if (name.isEmpty()) { errorLabel.setText("Please enter your name."); return; }
-            boolean ok = com.campusshare.db.DAO.registerUser(name, email, pass, "STUDENT", "CSE", 1);
-            if (!ok) { errorLabel.setText("Email already registered."); return; }
-            DataStore.User u = DataStore.login(email, pass);
-            if (u == null) { errorLabel.setText("Registration error."); return; }
-            DataStore.setCurrentUser(u);
-            DataStore.loadAll();
-            if (animTimer != null) animTimer.stop();
-            setVisible(false);
-            dispose();
-            SwingUtilities.invokeLater(onLoginSuccess);
-            return;
-        }
+        if (errorLabel==null) return;
+        String email=emailField.getText().trim(), pass=new String(passField.getPassword());
+        if (email.isEmpty()||pass.isEmpty()) { errorLabel.setText("Please fill in all fields."); return; }
         DataStore.User u = DataStore.login(email, pass);
-        if (u == null) { errorLabel.setText("Invalid email or password."); return; }
-        DataStore.setCurrentUser(u);
-        DataStore.loadAll();
-        // Save for auto re-auth on reconnect
-        CredentialStore.save(email, pass);
-        if (animTimer != null) animTimer.stop();
-        setVisible(false);
-        dispose();
-        SwingUtilities.invokeLater(onLoginSuccess);
+        if (u==null) { errorLabel.setText("Invalid email or password."); return; }
+        DataStore.setCurrentUser(u); DataStore.loadAll(); CredentialStore.save(email, pass); finish();
     }
-
-    private Timer animTimer;
 
     private void doSignUp() {
-        String name  = nameField.getText().trim();
-        String email = emailField.getText().trim();
-        String pass  = new String(passField.getPassword());
-        if (name.isEmpty()||email.isEmpty()||pass.isEmpty()) {
-            errorLabel.setText("Please fill in all fields."); return;
-        }
-        if (pass.length() < 6) {
-            errorLabel.setText("Password must be at least 6 characters."); return;
-        }
-        String dept = deptBox != null ? (String)deptBox.getSelectedItem() : "CSE";
-        boolean ok = com.campusshare.db.DAO.registerUser(name, email, pass, "STUDENT", dept, 1);
+        if (errorLabel==null) return;
+        String name  = nameField  !=null ? nameField.getText().trim()        : "";
+        String email = emailField !=null ? emailField.getText().trim()        : "";
+        String pass  = passField  !=null ? new String(passField.getPassword()): "";
+        String dept  = deptBox    !=null ? (String) deptBox.getSelectedItem() : "CSE";
+        String role  = roleBox    !=null ? (String) roleBox.getSelectedItem() : "Student";
+        String sid   = studentIdField != null ? studentIdField.getText().trim() : "";
+        boolean isFaculty = "Faculty".equals(role);
+        int sem = (!isFaculty && semBox!=null)
+            ? Integer.parseInt((String) Objects.requireNonNull(semBox.getSelectedItem())) : 0;
+        String dbRole = isFaculty ? "FACULTY" : "STUDENT";
+
+        if (name.isEmpty()||email.isEmpty()||pass.isEmpty()) { errorLabel.setText("Please fill in all fields."); return; }
+        if (pass.length()<6) { errorLabel.setText("Password must be at least 6 characters."); return; }
+        boolean ok = com.campusshare.db.DAO.registerUser(name, email, pass, dbRole, dept, sem);
         if (!ok) { errorLabel.setText("Email already registered."); return; }
         DataStore.User u = DataStore.login(email, pass);
-        if (u == null) { errorLabel.setText("Registration error. Try again."); return; }
-        DataStore.setCurrentUser(u);
-        DataStore.loadAll();
-        if (animTimer != null) animTimer.stop();
-        onLoginSuccess.run();
+        if (u==null) { errorLabel.setText("Registration error. Try again."); return; }
+        // Save student/employee ID if provided
+        if (!sid.isEmpty()) { com.campusshare.db.DAO.updateStudentId(u.id, sid); u.studentId = sid; }
+        DataStore.setCurrentUser(u); DataStore.loadAll(); finish();
     }
 
-    private void switchToSignUp() {
-        Container rp = ((JPanel)getContentPane()).getComponent(1).getParent();
-        // Find right panel and swap card
-        Component rightComp = ((JPanel)getContentPane()).getComponent(1);
-        if (rightComp instanceof JPanel rPanel) {
-            rPanel.removeAll();
-            JPanel newCard = buildSignUpCard();
-            rPanel.add(newCard, new GridBagConstraints());
-            rPanel.revalidate(); rPanel.repaint();
-        }
-        setTitle("CampusShare \u2014 Sign Up");
-    }
-
-    private void switchToLogin() {
-        Component rightComp = ((JPanel)getContentPane()).getComponent(1);
-        if (rightComp instanceof JPanel rPanel) {
-            rPanel.removeAll();
-            JPanel newCard = buildLoginCard();
-            rPanel.add(newCard, new GridBagConstraints());
-            rPanel.revalidate(); rPanel.repaint();
-        }
-        setTitle("CampusShare \u2014 Sign In");
-    }
-
-    /** Returns the root panel so it can be embedded in another JFrame without creating a new window. */
-    public JPanel getContentPanel() {
-        return (JPanel) getContentPane();
-    }
+    private void finish() { setVisible(false); dispose(); SwingUtilities.invokeLater(onLoginSuccess); }
+    public JPanel getContentPanel() { return (JPanel) getContentPane(); }
 }

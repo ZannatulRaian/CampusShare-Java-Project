@@ -63,13 +63,13 @@ public class Theme {
     public static Font font(int style, float size) {
         return new Font("SansSerif", style, (int) size);
     }
-    public static final Font FONT_DISPLAY = font(Font.BOLD, 34);
-    public static final Font FONT_TITLE   = font(Font.BOLD, 24);
-    public static final Font FONT_H2      = font(Font.BOLD, 18);
-    public static final Font FONT_BODY    = font(Font.PLAIN, 16);
-    public static final Font FONT_SMALL   = font(Font.PLAIN, 14);
-    public static final Font FONT_TINY    = font(Font.PLAIN, 13);
-    public static final Font FONT_LABEL   = font(Font.BOLD, 13);
+    public static final Font FONT_DISPLAY = font(Font.BOLD, 42);
+    public static final Font FONT_TITLE   = font(Font.BOLD, 30);
+    public static final Font FONT_H2      = font(Font.BOLD, 24);
+    public static final Font FONT_BODY    = font(Font.PLAIN, 20);
+    public static final Font FONT_SMALL   = font(Font.PLAIN, 18);
+    public static final Font FONT_TINY    = font(Font.PLAIN, 16);
+    public static final Font FONT_LABEL   = font(Font.BOLD, 17);
 
     // Cards
     public static JPanel card() {
@@ -132,7 +132,7 @@ public class Theme {
                 g2.setColor(bg);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
                 g2.setColor(Color.WHITE);
-                g2.setFont(font(Font.BOLD, 15));
+                g2.setFont(font(Font.BOLD, 17));
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString(getText(),
                     (getWidth() - fm.stringWidth(getText())) / 2,
@@ -140,7 +140,7 @@ public class Theme {
                 g2.dispose();
             }
         };
-        b.setPreferredSize(new Dimension(160, 40));
+        b.setPreferredSize(new Dimension(160, 46));
         b.setOpaque(false); b.setContentAreaFilled(false);
         b.setBorderPainted(false); b.setFocusPainted(false);
         b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -156,7 +156,7 @@ public class Theme {
                 g2.setColor(bg);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
                 g2.setColor(Color.WHITE);
-                g2.setFont(font(Font.BOLD, 14));
+                g2.setFont(font(Font.BOLD, 16));
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString(getText(),
                     (getWidth() - fm.stringWidth(getText())) / 2,
@@ -164,7 +164,7 @@ public class Theme {
                 g2.dispose();
             }
         };
-        b.setPreferredSize(new Dimension(90, 34));
+        b.setPreferredSize(new Dimension(100, 38));
         b.setOpaque(false); b.setContentAreaFilled(false);
         b.setBorderPainted(false); b.setFocusPainted(false);
         b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -184,7 +184,7 @@ public class Theme {
                 g2.setColor(new Color(fg.getRed(), fg.getGreen(), fg.getBlue(), 80));
                 g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 8, 8);
                 g2.setColor(fg);
-                g2.setFont(font(Font.BOLD, 14));
+                g2.setFont(font(Font.BOLD, 16));
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString(getText(),
                     (getWidth() - fm.stringWidth(getText())) / 2,
@@ -283,16 +283,16 @@ public class Theme {
                 super.paintComponent(g);
             }
         };
-        l.setFont(font(Font.BOLD, 13));
+        l.setFont(font(Font.BOLD, 15));
         l.setForeground(fg);
-        l.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
+        l.setBorder(BorderFactory.createEmptyBorder(4, 10, 4, 10));
         l.setOpaque(false);
         return l;
     }
 
     public static JLabel sectionTitle(String text) {
         JLabel l = new JLabel(text);
-        l.setFont(font(Font.BOLD, 14));
+        l.setFont(font(Font.BOLD, 17));
         l.setForeground(TEXT_DARK);
         return l;
     }

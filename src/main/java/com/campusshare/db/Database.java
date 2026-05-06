@@ -4,13 +4,6 @@ import java.io.File;
 import java.sql.*;
 import java.util.Properties;
 
-/**
- * Manages the SQLite connection.
- * DB file: ~/CampusShare/campusshare.db
- *
- * Column names in this schema are kept identical to what DAO.java expects,
- * so there is no mismatch between the CREATE TABLE statements and the queries.
- */
 public class Database {
 
     private static Connection conn;
@@ -26,26 +19,20 @@ public class Database {
         catch (ClassNotFoundException e) { throw new RuntimeException("SQLite driver missing", e); }
 
         File dbFile = new File(dir, "campusshare.db");
-
         conn = openConnection(dbFile);
 
         if (conn == null) {
             System.out.println("[CampusShare] DB locked — wiping and retrying...");
-            for (String suffix : new String[]{"", "-wal", "-shm", "-journal"}) {
+            for (String suffix : new String[]{"", "-wal", "-shm", "-journal"})
                 new File(dir, "campusshare.db" + suffix).delete();
-            }
             conn = openConnection(dbFile);
         }
-
         if (conn == null) throw new RuntimeException(
-            "Cannot open database even after reset.\nDelete this folder and try again:\n" + dir.getAbsolutePath());
+            "Cannot open database even after reset.\nDelete:\n" + dir.getAbsolutePath());
 
         try {
-            // ── Schema version guard ─────────────────────────────────────────
-            // If the DB was created with the old schema (column 'id' not 'user_id')
-            // we drop everything and start fresh so DAO queries work correctly.
             if (hasOldSchema(conn)) {
-                System.out.println("[CampusShare] Old schema detected — dropping all tables for fresh start.");
+                System.out.println("[CampusShare] Old schema — dropping all tables.");
                 dropAllTables(conn);
             }
             createSchema(conn);
@@ -56,28 +43,19 @@ public class Database {
             e.printStackTrace();
             throw new RuntimeException("Schema/seed error: " + e.getMessage(), e);
         }
-
         return conn;
     }
 
-    /** Called from the shutdown hook in CampusShareApp. */
     public static synchronized void close() {
-        if (conn != null) {
-            try { conn.close(); } catch (SQLException ignored) {}
-            conn = null;
-        }
+        if (conn != null) { try { conn.close(); } catch (SQLException ignored) {} conn = null; }
     }
 
-    // ── Check if this is the old schema (uses 'id' instead of 'user_id') ────
     private static boolean hasOldSchema(Connection c) {
         try {
             ResultSet rs = c.getMetaData().getColumns(null, null, "users", "user_id");
-            boolean hasNew = rs.next();
-            rs.close();
-            // If 'user_id' column doesn't exist but 'users' table does → old schema
+            boolean hasNew = rs.next(); rs.close();
             ResultSet tbl = c.getMetaData().getTables(null, null, "users", null);
-            boolean hasTable = tbl.next();
-            tbl.close();
+            boolean hasTable = tbl.next(); tbl.close();
             return hasTable && !hasNew;
         } catch (SQLException e) { return false; }
     }
@@ -86,10 +64,8 @@ public class Database {
         try (Statement st = c.createStatement()) {
             st.execute("PRAGMA foreign_keys=OFF");
             for (String t : new String[]{
-                "messages","announcements","events","resources","subjects","users"
-            }) {
-                st.execute("DROP TABLE IF EXISTS " + t);
-            }
+                "notifications","messages","announcements","events","resources","subjects","channels","users"
+            }) st.execute("DROP TABLE IF EXISTS " + t);
             st.execute("PRAGMA foreign_keys=ON");
         }
     }
@@ -115,28 +91,31 @@ public class Database {
         }
     }
 
-    /**
-     * All column names here EXACTLY match what DAO.java reads/writes.
-     * Do not rename columns without updating DAO as well.
-     */
-    /** Adds columns that did not exist in older schema versions. */
     private static void migrateSchema(Connection c) throws SQLException {
         try (Statement st = c.createStatement()) {
-            // v5 — profile photo path
-            try { st.execute("ALTER TABLE users ADD COLUMN avatar_path TEXT NOT NULL DEFAULT ''"); }
-            catch (SQLException ignored) {}
-            // v6 — real online tracking
-            try { st.execute("ALTER TABLE users ADD COLUMN last_seen TEXT NOT NULL DEFAULT ''"); }
-            catch (SQLException ignored) {}
-            // v12 — unified messages table: add type and recipient_id to messages
-            try { st.execute("ALTER TABLE messages ADD COLUMN type TEXT NOT NULL DEFAULT 'channel'"); }
-            catch (SQLException ignored) {}
-            try { st.execute("ALTER TABLE messages ADD COLUMN recipient_id INTEGER"); }
-            catch (SQLException ignored) {}
-            // v13 — mark whether a row has been pushed to Supabase yet
-            try { st.execute("ALTER TABLE messages ADD COLUMN synced INTEGER NOT NULL DEFAULT 0"); }
-            catch (SQLException ignored) {}
-            // Migrate old DM data if direct_messages table still exists
+            // existing migrations
+            try { st.execute("ALTER TABLE users ADD COLUMN avatar_path TEXT NOT NULL DEFAULT ''"); } catch (SQLException ignored) {}
+            try { st.execute("ALTER TABLE announcements ADD COLUMN department TEXT NOT NULL DEFAULT 'ALL'"); } catch (SQLException ignored) {}
+            try { st.execute("ALTER TABLE events ADD COLUMN department TEXT NOT NULL DEFAULT 'ALL'"); } catch (SQLException ignored) {}
+            try { st.execute("ALTER TABLE users ADD COLUMN last_seen TEXT NOT NULL DEFAULT ''"); } catch (SQLException ignored) {}
+            try { st.execute("ALTER TABLE messages ADD COLUMN type TEXT NOT NULL DEFAULT 'channel'"); } catch (SQLException ignored) {}
+            try { st.execute("ALTER TABLE messages ADD COLUMN recipient_id INTEGER"); } catch (SQLException ignored) {}
+            try { st.execute("ALTER TABLE messages ADD COLUMN synced INTEGER NOT NULL DEFAULT 0"); } catch (SQLException ignored) {}
+            // v14 — semester column on subjects
+            try { st.execute("ALTER TABLE subjects ADD COLUMN semester INTEGER NOT NULL DEFAULT 1"); } catch (SQLException ignored) {}
+            // v15 — notifications table (if not created by createSchema)
+            try {
+                st.execute("CREATE TABLE IF NOT EXISTS notifications (" +
+                    "notif_id   INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "user_id    INTEGER REFERENCES users(user_id)," +
+                    "type       TEXT NOT NULL DEFAULT 'info'," +
+                    "title      TEXT NOT NULL," +
+                    "body       TEXT NOT NULL DEFAULT ''," +
+                    "ref_id     INTEGER DEFAULT 0," +
+                    "is_read    INTEGER NOT NULL DEFAULT 0," +
+                    "created_at TEXT NOT NULL DEFAULT (datetime('now')))");
+            } catch (SQLException ignored) {}
+            // Migrate old DM data
             try {
                 ResultSet chk = c.createStatement().executeQuery(
                     "SELECT name FROM sqlite_master WHERE type='table' AND name='direct_messages'");
@@ -152,7 +131,7 @@ public class Database {
     private static void createSchema(Connection c) throws SQLException {
         try (Statement st = c.createStatement()) {
 
-            // ── users ────────────────────────────────────────────────────────
+            // users
             st.execute(
                 "CREATE TABLE IF NOT EXISTS users (" +
                 "user_id       INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -165,16 +144,17 @@ public class Database {
                 "department    TEXT    NOT NULL DEFAULT 'CSE'," +
                 "semester      INTEGER NOT NULL DEFAULT 1)");
 
-            // ── subjects ─────────────────────────────────────────────────────
+            // subjects — now with semester
             st.execute(
                 "CREATE TABLE IF NOT EXISTS subjects (" +
                 "subject_id   INTEGER PRIMARY KEY AUTOINCREMENT," +
                 "name         TEXT    NOT NULL," +
                 "code         TEXT    NOT NULL," +
                 "department   TEXT    NOT NULL," +
+                "semester     INTEGER NOT NULL DEFAULT 1," +
                 "credit_hours INTEGER NOT NULL DEFAULT 3)");
 
-            // ── resources (notes) ─────────────────────────────────────────────
+            // resources (notes)
             st.execute(
                 "CREATE TABLE IF NOT EXISTS resources (" +
                 "resource_id  INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -187,7 +167,7 @@ public class Database {
                 "approved     INTEGER NOT NULL DEFAULT 0," +
                 "uploaded_at  TEXT    NOT NULL DEFAULT (datetime('now')))");
 
-            // ── events ────────────────────────────────────────────────────────
+            // events
             st.execute(
                 "CREATE TABLE IF NOT EXISTS events (" +
                 "event_id   INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -196,9 +176,10 @@ public class Database {
                 "event_time TEXT    NOT NULL DEFAULT '00:00'," +
                 "category   TEXT    NOT NULL DEFAULT 'SEMINAR'," +
                 "location   TEXT    NOT NULL DEFAULT 'TBA'," +
+                "department TEXT    NOT NULL DEFAULT 'ALL'," +
                 "created_by INTEGER REFERENCES users(user_id))");
 
-            // ── announcements ─────────────────────────────────────────────────
+            // announcements
             st.execute(
                 "CREATE TABLE IF NOT EXISTS announcements (" +
                 "ann_id     INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -206,11 +187,18 @@ public class Database {
                 "body       TEXT    NOT NULL," +
                 "posted_by  INTEGER REFERENCES users(user_id)," +
                 "tag        TEXT    NOT NULL DEFAULT 'GENERAL'," +
+                "department TEXT    NOT NULL DEFAULT 'ALL'," +
                 "created_at TEXT    NOT NULL DEFAULT (datetime('now')))");
 
-            // ── messages (channel + DM unified) ──────────────────────────────
-            // type='channel' → channel field set, recipient_id NULL
-            // type='dm'      → recipient_id set, channel NULL
+            // channels — admin-managed group channels
+            st.execute(
+                "CREATE TABLE IF NOT EXISTS channels (" +
+                "channel_id   INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "name         TEXT    NOT NULL UNIQUE," +
+                "department   TEXT    NOT NULL DEFAULT 'ALL'," +
+                "is_general   INTEGER NOT NULL DEFAULT 0)");
+
+            // messages (channel + DM unified)
             st.execute(
                 "CREATE TABLE IF NOT EXISTS messages (" +
                 "message_id   INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -221,6 +209,18 @@ public class Database {
                 "content      TEXT    NOT NULL," +
                 "sent_at      TEXT    NOT NULL DEFAULT (datetime('now'))," +
                 "synced       INTEGER NOT NULL DEFAULT 0)");
+
+            // notifications
+            st.execute(
+                "CREATE TABLE IF NOT EXISTS notifications (" +
+                "notif_id   INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "user_id    INTEGER REFERENCES users(user_id)," +
+                "type       TEXT NOT NULL DEFAULT 'info'," +
+                "title      TEXT NOT NULL," +
+                "body       TEXT NOT NULL DEFAULT ''," +
+                "ref_id     INTEGER DEFAULT 0," +
+                "is_read    INTEGER NOT NULL DEFAULT 0," +
+                "created_at TEXT NOT NULL DEFAULT (datetime('now')))");
         }
     }
 }

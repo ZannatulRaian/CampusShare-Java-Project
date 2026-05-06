@@ -44,6 +44,10 @@ public class DAO {
     // AUTH
     // ══════════════════════════════════════════════════════════════════════════
 
+    // Emails that failed Supabase registration (e.g. invalid domain) — never retry
+    private static final java.util.Set<String> supabaseRegBlacklist =
+        java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+
     public static DataStore.User login(String email, String password) {
         if (SupabaseConfig.isConfigured() && !SupabaseConfig.FORCE_OFFLINE) {
             // Step 1: Try to sign in to Supabase
@@ -53,19 +57,22 @@ public class DAO {
             // Step 2: Supabase sign-in failed — check if local account exists
             DataStore.User localUser = loginLocal(email, password);
             if (localUser != null) {
-                // Local account exists but not in Supabase Auth yet.
-                // Auto-register them in Supabase so cloud sync works from now on.
-                System.out.println("[Auth] Auto-registering " + email + " in Supabase...");
-                boolean registered = registerSupabase(
-                    localUser.fullName, email, password,
-                    localUser.role, localUser.department, localUser.semester);
-                if (registered) {
-                    System.out.println("[Auth] Supabase registration OK — signing in...");
-                    DataStore.User cloudUser2 = loginSupabase(email, password);
-                    if (cloudUser2 != null) return cloudUser2;
+                // Only attempt auto-register if not already blacklisted
+                if (!supabaseRegBlacklist.contains(email)) {
+                    System.out.println("[Auth] Auto-registering " + email + " in Supabase...");
+                    boolean registered = registerSupabase(
+                        localUser.fullName, email, password,
+                        localUser.role, localUser.department, localUser.semester);
+                    if (registered) {
+                        System.out.println("[Auth] Supabase registration OK — signing in...");
+                        DataStore.User cloudUser2 = loginSupabase(email, password);
+                        if (cloudUser2 != null) return cloudUser2;
+                    } else {
+                        // Mark as blacklisted so we never retry this email
+                        supabaseRegBlacklist.add(email);
+                    }
                 }
-                // Auto-register failed or email confirmation still needed
-                // — return local user so app still works offline
+                // Auto-register failed or blacklisted — return local user (offline mode)
                 System.out.println("[Auth] Could not create Supabase account — running offline for this session.");
                 return localUser;
             }
@@ -273,6 +280,21 @@ public class DAO {
         } catch (SQLException e) { e.printStackTrace(); return false; }
     }
 
+    public static boolean updateStudentId(int userId, String studentId) {
+        if (useSupabase()) {
+            String myUuid = SupabaseClient.getUserId();
+            if (myUuid == null) return false;
+            JSONObject patch = new JSONObject().put("student_id", studentId);
+            return SupabaseClient.update("users", "user_uuid=eq." + myUuid, patch) != null;
+        }
+        try {
+            PreparedStatement ps = Database.get().prepareStatement(
+                "UPDATE users SET student_id=? WHERE user_id=?");
+            ps.setString(1, studentId); ps.setInt(2, userId);
+            ps.executeUpdate(); return true;
+        } catch (SQLException e) { e.printStackTrace(); return false; }
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     // USERS
     // ══════════════════════════════════════════════════════════════════════════
@@ -299,13 +321,13 @@ public class DAO {
     public static List<DataStore.Subject> getAllSubjects() {
         List<DataStore.Subject> list = new ArrayList<>();
         if (useSupabase()) {
-            JSONArray rows = SupabaseClient.select("subjects", "?select=*&order=name.asc");
+            JSONArray rows = SupabaseClient.select("subjects", "?select=*&order=department.asc,semester.asc,name.asc");
             for (int i = 0; i < rows.length(); i++) list.add(mapSubjectFromJson(rows.getJSONObject(i)));
             return list;
         }
         try {
             ResultSet rs = Database.get().createStatement()
-                .executeQuery("SELECT * FROM subjects ORDER BY name");
+                .executeQuery("SELECT * FROM subjects ORDER BY department, semester, name");
             while (rs.next()) list.add(mapSubjectFromRs(rs));
         } catch (SQLException e) { e.printStackTrace(); }
         return list;
@@ -514,22 +536,24 @@ public class DAO {
 
     public static int addEvent(String title, String date, String time,
                                 String category, String location, int createdBy) {
-        // Always write local first
+        return addEvent(title, date, time, category, location, createdBy, "ALL");
+    }
+    public static int addEvent(String title, String date, String time,
+                                String category, String location, int createdBy, String department) {
         int localId = -1;
         try {
             PreparedStatement ps = Database.get().prepareStatement(
-                "INSERT INTO events (title,event_date,event_time,category,location,created_by) VALUES(?,?,?,?,?,?)",
+                "INSERT INTO events (title,event_date,event_time,category,location,department,created_by) VALUES(?,?,?,?,?,?,?)",
                 Statement.RETURN_GENERATED_KEYS);
             ps.setString(1,title); ps.setString(2,date); ps.setString(3,time);
-            ps.setString(4,category); ps.setString(5,location); ps.setInt(6,createdBy);
+            ps.setString(4,category); ps.setString(5,location); ps.setString(6,department); ps.setInt(7,createdBy);
             ps.executeUpdate();
             ResultSet k = ps.getGeneratedKeys(); if (k.next()) localId = k.getInt(1);
         } catch (SQLException e) { e.printStackTrace(); }
-        // Also push to cloud if online (translate local user_id → Supabase user_id)
         if (useSupabase()) {
             JSONObject row = new JSONObject()
                 .put("title", title).put("event_date", date).put("event_time", time)
-                .put("category", category).put("location", location);
+                .put("category", category).put("location", location).put("department", department);
             Integer cloudCreator = getCloudUserId(createdBy);
             if (cloudCreator != null) row.put("created_by", cloudCreator);
             SupabaseClient.insert("events", row);
@@ -571,21 +595,20 @@ public class DAO {
     }
 
     public static int addAnnouncement(String title, String body, int postedBy, String tag) {
-        // Always write local first
+        return addAnnouncement(title, body, postedBy, tag, "ALL");
+    }
+    public static int addAnnouncement(String title, String body, int postedBy, String tag, String department) {
         int localId = -1;
         try {
             PreparedStatement ps = Database.get().prepareStatement(
-                "INSERT INTO announcements (title,body,posted_by,tag) VALUES(?,?,?,?)",
+                "INSERT INTO announcements (title,body,posted_by,tag,department) VALUES(?,?,?,?,?)",
                 Statement.RETURN_GENERATED_KEYS);
-            ps.setString(1,title); ps.setString(2,body); ps.setInt(3,postedBy); ps.setString(4,tag);
+            ps.setString(1,title); ps.setString(2,body); ps.setInt(3,postedBy); ps.setString(4,tag); ps.setString(5,department);
             ps.executeUpdate();
             ResultSet k = ps.getGeneratedKeys(); if (k.next()) localId = k.getInt(1);
         } catch (SQLException e) { e.printStackTrace(); }
-        // Also push to cloud if online (translate local user_id → Supabase user_id)
         if (useSupabase()) {
-            JSONObject row = new JSONObject()
-                .put("title", title).put("body", body)
-                .put("tag", tag);
+            JSONObject row = new JSONObject().put("title", title).put("body", body).put("tag", tag).put("department", department);
             Integer cloudPoster = getCloudUserId(postedBy);
             if (cloudPoster != null) row.put("posted_by", cloudPoster);
             SupabaseClient.insert("announcements", row);
@@ -758,19 +781,21 @@ public class DAO {
             String email = o.optString("email", "");
             fullName = email.contains("@") ? email.substring(0, email.indexOf('@')) : "Unknown User";
         }
-        return new DataStore.User(
+        DataStore.User u = new DataStore.User(
             o.optInt("user_id", o.optInt("id", 0)),
             fullName,
             o.optString("email"),
             o.optString("role", "STUDENT"),
             o.optString("department", ""),
             o.optInt("semester", 0));
+        u.studentId = o.optString("student_id", "");
+        return u;
     }
 
     private static DataStore.Subject mapSubjectFromJson(JSONObject o) {
         return new DataStore.Subject(
             o.optInt("subject_id"), o.optString("name"), o.optString("code"),
-            o.optString("department"), o.optInt("credit_hours", 3));
+            o.optString("department"), o.optInt("semester", 1), o.optInt("credit_hours", 3));
     }
 
     private static DataStore.Note mapNoteFromJson(JSONObject o) {
@@ -795,7 +820,7 @@ public class DAO {
             o.optInt("event_id"), o.optString("title"),
             o.optString("event_date"), o.optString("event_time"),
             o.optString("category"), o.optString("location"),
-            o.optInt("created_by"));
+            o.optString("department", "ALL"));
     }
 
     private static DataStore.Announcement mapAnnouncementFromJson(JSONObject o) {
@@ -810,7 +835,7 @@ public class DAO {
         if (date.length() > 10) date = date.substring(0, 10);
         return new DataStore.Announcement(
             o.optInt("ann_id"), o.optString("title"), o.optString("body"),
-            posterName, date, o.optString("tag", "GENERAL"));
+            posterName, date, o.optString("tag", "GENERAL"), o.optString("department", "ALL"));
     }
 
 
@@ -955,6 +980,7 @@ public class DAO {
             rs.getString("department"), rs.getInt("semester"));
         try { u.avatarPath = rs.getString("avatar_path"); } catch (SQLException ignored) {}
         try { u.lastSeen  = rs.getString("last_seen");   } catch (SQLException ignored) {}
+        try { u.studentId = rs.getString("student_id");  } catch (SQLException ignored) {}
         return u;
     }
 
@@ -992,8 +1018,10 @@ public class DAO {
     }
 
     private static DataStore.Subject mapSubjectFromRs(ResultSet rs) throws SQLException {
+        int sem = 1;
+        try { sem = rs.getInt("semester"); } catch (SQLException ignored) {}
         return new DataStore.Subject(rs.getInt("subject_id"), rs.getString("name"),
-            rs.getString("code"), rs.getString("department"), rs.getInt("credit_hours"));
+            rs.getString("code"), rs.getString("department"), sem, rs.getInt("credit_hours"));
     }
 
     private static DataStore.Note mapNoteFromRs(ResultSet rs) throws SQLException {
@@ -1004,15 +1032,17 @@ public class DAO {
     }
 
     private static DataStore.Event mapEventFromRs(ResultSet rs) throws SQLException {
+        String dept = "ALL"; try { dept = rs.getString("department"); if (dept==null) dept="ALL"; } catch (Exception ignored) {}
         return new DataStore.Event(rs.getInt("event_id"), rs.getString("title"),
             rs.getString("event_date"), rs.getString("event_time"),
-            rs.getString("category"), rs.getString("location"), rs.getInt("created_by"));
+            rs.getString("category"), rs.getString("location"), dept);
     }
 
     private static DataStore.Announcement mapAnnouncementFromRs(ResultSet rs) throws SQLException {
         String date = rs.getString("created_at"); if (date!=null&&date.length()>10) date=date.substring(0,10);
+        String dept = "ALL"; try { dept = rs.getString("department"); if (dept==null) dept="ALL"; } catch (Exception ignored) {}
         return new DataStore.Announcement(rs.getInt("ann_id"), rs.getString("title"),
-            rs.getString("body"), rs.getString("poster_name"), date, rs.getString("tag"));
+            rs.getString("body"), rs.getString("poster_name"), date, rs.getString("tag"), dept);
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -1026,5 +1056,187 @@ public class DAO {
             case "DOCX" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
             default     -> "application/octet-stream";
         };
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // CHANNELS
+    // ══════════════════════════════════════════════════════════════════════════
+
+    public static List<DataStore.Channel> getAllChannels() {
+        List<DataStore.Channel> list = new ArrayList<>();
+        try {
+            ResultSet rs = Database.get().createStatement()
+                .executeQuery("SELECT * FROM channels ORDER BY is_general DESC, name ASC");
+            while (rs.next()) {
+                list.add(new DataStore.Channel(
+                    rs.getInt("channel_id"), rs.getString("name"),
+                    rs.getString("department"), rs.getInt("is_general") == 1));
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return list;
+    }
+
+    public static boolean addChannel(String name, String department, boolean isGeneral) {
+        try {
+            PreparedStatement ps = Database.get().prepareStatement(
+                "INSERT OR IGNORE INTO channels(name,department,is_general) VALUES(?,?,?)");
+            ps.setString(1, name.toLowerCase().trim());
+            ps.setString(2, department.toUpperCase().trim());
+            ps.setInt(3, isGeneral ? 1 : 0);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) { e.printStackTrace(); return false; }
+    }
+
+    public static boolean deleteChannel(String name) {
+        try {
+            PreparedStatement ps = Database.get().prepareStatement(
+                "DELETE FROM channels WHERE name=?");
+            ps.setString(1, name);
+            // Also delete messages in this channel
+            PreparedStatement ps2 = Database.get().prepareStatement(
+                "DELETE FROM messages WHERE type='channel' AND channel=?");
+            ps2.setString(1, name); ps2.executeUpdate();
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) { e.printStackTrace(); return false; }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // SUBJECTS (with semester)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    public static int createSubjectWithSemester(String name, String code, String department, int semester, int creditHours) {
+        try {
+            PreparedStatement ps = Database.get().prepareStatement(
+                "INSERT INTO subjects (name, code, department, semester, credit_hours) VALUES (?, ?, ?, ?, ?)",
+                Statement.RETURN_GENERATED_KEYS);
+            ps.setString(1, name); ps.setString(2, code);
+            ps.setString(3, department); ps.setInt(4, semester); ps.setInt(5, creditHours);
+            ps.executeUpdate();
+            ResultSet keys = ps.getGeneratedKeys();
+            return keys.next() ? keys.getInt(1) : -1;
+        } catch (SQLException e) { e.printStackTrace(); return -1; }
+    }
+
+    public static boolean deleteSubject(int subjectId) {
+        try {
+            PreparedStatement ps = Database.get().prepareStatement(
+                "DELETE FROM subjects WHERE subject_id=?");
+            ps.setInt(1, subjectId); return ps.executeUpdate() > 0;
+        } catch (SQLException e) { e.printStackTrace(); return false; }
+    }
+
+    // Override getAllSubjects to include semester
+    // (replaces the version above — we re-declare it here as getAllSubjectsFull)
+    public static List<DataStore.Subject> getAllSubjectsFull() {
+        List<DataStore.Subject> list = new ArrayList<>();
+        try {
+            ResultSet rs = Database.get().createStatement()
+                .executeQuery("SELECT * FROM subjects ORDER BY department, semester, name");
+            while (rs.next()) {
+                DataStore.Subject s = new DataStore.Subject(
+                    rs.getInt("subject_id"), rs.getString("name"),
+                    rs.getString("code"), rs.getString("department"),
+                    rs.getInt("semester"), rs.getInt("credit_hours"));
+                list.add(s);
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return list;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // NOTIFICATIONS
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /** Push a notification to a specific user. */
+    public static void pushNotification(int userId, String type, String title, String body, int refId) {
+        try {
+            PreparedStatement ps = Database.get().prepareStatement(
+                "INSERT INTO notifications(user_id,type,title,body,ref_id) VALUES(?,?,?,?,?)");
+            ps.setInt(1, userId); ps.setString(2, type);
+            ps.setString(3, title); ps.setString(4, body); ps.setInt(5, refId);
+            ps.executeUpdate();
+        } catch (SQLException e) { e.printStackTrace(); }
+    }
+
+    /** Push a notification to ALL users with a given department (or "ALL"), excluding the actor. */
+    public static void pushNotificationToAll(String department, String type, String title, String body, int refId, int excludeUserId) {
+        try {
+            String sql = "ALL".equalsIgnoreCase(department)
+                ? "SELECT user_id FROM users WHERE user_id != ?"
+                : "SELECT user_id FROM users WHERE user_id != ? AND (department=? OR role IN ('FACULTY','ADMIN'))";
+            PreparedStatement ps = Database.get().prepareStatement(sql);
+            ps.setInt(1, excludeUserId);
+            if (!"ALL".equalsIgnoreCase(department)) ps.setString(2, department);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) pushNotification(rs.getInt(1), type, title, body, refId);
+        } catch (SQLException e) { e.printStackTrace(); }
+    }
+
+    /**
+     * Push a note notification, excluding the uploader and filtering students
+     * to only those in the matching semester.
+     */
+    public static void pushNoteNotificationToAll(String department, int semester, String title, String body, int refId, int excludeUserId) {
+        try {
+            // Students must match both department AND semester; faculty/admin always receive
+            String sql = "SELECT user_id FROM users WHERE user_id != ? AND (" +
+                "role IN ('FACULTY','ADMIN') OR " +
+                "(department=? AND semester=?)" +
+                ")";
+            PreparedStatement ps = Database.get().prepareStatement(sql);
+            ps.setInt(1, excludeUserId);
+            ps.setString(2, department);
+            ps.setInt(3, semester);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) pushNotification(rs.getInt(1), "note", title, body, refId);
+        } catch (SQLException e) { e.printStackTrace(); }
+    }
+
+    /** Backwards-compatible overload (no exclusion). */
+    public static void pushNotificationToAll(String department, String type, String title, String body, int refId) {
+        pushNotificationToAll(department, type, title, body, refId, -1);
+    }
+
+    public static List<DataStore.Notification> getNotifications(int userId, int limit) {
+        List<DataStore.Notification> list = new ArrayList<>();
+        try {
+            PreparedStatement ps = Database.get().prepareStatement(
+                "SELECT * FROM notifications WHERE user_id=? ORDER BY created_at DESC LIMIT ?");
+            ps.setInt(1, userId); ps.setInt(2, limit);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                list.add(new DataStore.Notification(
+                    rs.getInt("notif_id"), rs.getInt("user_id"), rs.getString("type"),
+                    rs.getString("title"), rs.getString("body"), rs.getInt("ref_id"),
+                    rs.getInt("is_read") == 1, rs.getString("created_at")));
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return list;
+    }
+
+    public static int getUnreadNotificationCount(int userId) {
+        try {
+            PreparedStatement ps = Database.get().prepareStatement(
+                "SELECT COUNT(*) FROM notifications WHERE user_id=? AND is_read=0");
+            ps.setInt(1, userId);
+            ResultSet rs = ps.executeQuery();
+            return rs.next() ? rs.getInt(1) : 0;
+        } catch (SQLException e) { e.printStackTrace(); return 0; }
+    }
+
+    public static void markNotificationsRead(int userId) {
+        try {
+            PreparedStatement ps = Database.get().prepareStatement(
+                "UPDATE notifications SET is_read=1 WHERE user_id=?");
+            ps.setInt(1, userId); ps.executeUpdate();
+        } catch (SQLException e) { e.printStackTrace(); }
+    }
+
+    public static void clearNotifications(int userId) {
+        try {
+            PreparedStatement ps = Database.get().prepareStatement(
+                "DELETE FROM notifications WHERE user_id=?");
+            ps.setInt(1, userId); ps.executeUpdate();
+        } catch (SQLException e) { e.printStackTrace(); }
     }
 }

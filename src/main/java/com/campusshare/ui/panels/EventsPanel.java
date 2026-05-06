@@ -1,16 +1,47 @@
 package com.campusshare.ui.panels;
 
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.Frame;
+import java.awt.GradientPaint;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.GridLayout;
+import java.awt.Insets;
+import java.awt.RenderingHints;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JDialog;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextField;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+
 import com.campusshare.data.DataStore;
 import com.campusshare.db.DAO;
-import com.campusshare.ui.*;
-import javax.swing.*;
-import javax.swing.border.*;
-import java.awt.*;
-import java.awt.event.*;
+import com.campusshare.ui.Theme;
 
 public class EventsPanel extends JPanel {
 
     private final DataStore.User user;
+    private JComboBox<String> deptFilter;
+    private static final String[] DEPTS = {"ALL","CSE","EEE","BBA","Law","English","Mathematics"};
 
     private static final Color[] ACCENTS = {
         new Color(0x6366F1), new Color(0x0D9488), new Color(0xF43F5E),
@@ -35,23 +66,42 @@ public class EventsPanel extends JPanel {
 
         JPanel left = new JPanel(); left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS)); left.setOpaque(false);
         JLabel title = new JLabel("Campus Events");
-        title.setFont(new Font("SansSerif", Font.BOLD, 26)); title.setForeground(Theme.TEXT_DARK);
+        title.setFont(new Font("SansSerif", Font.BOLD, 22)); title.setForeground(Theme.TEXT_DARK);
         JLabel sub = new JLabel(DataStore.EVENTS.size() + " events scheduled");
         sub.setFont(Theme.font(Font.PLAIN, 15)); sub.setForeground(Theme.TEXT_MUTE);
         left.add(title); left.add(Box.createVerticalStrut(2)); left.add(sub);
         header.add(left, BorderLayout.WEST);
 
+        JPanel rightH = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        rightH.setOpaque(false);
+        if (user.isFaculty()) {
+            deptFilter = new JComboBox<>(DEPTS);
+        } else {
+            deptFilter = new JComboBox<>(new String[]{"ALL", user.department});
+        }
+        deptFilter.setBackground(Theme.BG_INPUT); deptFilter.setForeground(Theme.TEXT_DARK);
+        deptFilter.setFont(Theme.font(Font.PLAIN, 15));
+        deptFilter.setPreferredSize(new Dimension(120, 32));
+        deptFilter.addActionListener(e -> rebuild());
+        rightH.add(deptFilter);
         if (user.isFaculty()) {
             JButton add = Theme.primaryButton("+ Add Event");
+            add.setPreferredSize(new Dimension(110, 32));
             add.addActionListener(e -> showAddDialog());
-            header.add(add, BorderLayout.EAST);
+            rightH.add(add);
         }
+        header.add(rightH, BorderLayout.EAST);
         add(header, BorderLayout.NORTH);
 
-        if (DataStore.EVENTS.isEmpty()) {
+        String selDept = deptFilter != null ? (String) deptFilter.getSelectedItem() : "ALL";
+        java.util.List<DataStore.Event> filteredEvents = DataStore.EVENTS.stream()
+            .filter(ev -> ev.visibleTo(user))
+            .filter(ev -> "ALL".equalsIgnoreCase(selDept) || "ALL".equalsIgnoreCase(ev.department) || ev.department.equalsIgnoreCase(selDept))
+            .collect(java.util.stream.Collectors.toList());
+        if (filteredEvents.isEmpty()) {
             JPanel empty = new JPanel(new BorderLayout()); empty.setOpaque(false);
-            JLabel lbl = new JLabel("No events yet");
-            lbl.setFont(Theme.font(Font.PLAIN, 17)); lbl.setForeground(Theme.TEXT_FAINT);
+            JLabel lbl = new JLabel("No events found");
+            lbl.setFont(Theme.font(Font.PLAIN, 24)); lbl.setForeground(Theme.TEXT_FAINT);
             lbl.setHorizontalAlignment(SwingConstants.CENTER);
             empty.add(lbl, BorderLayout.CENTER);
             add(empty, BorderLayout.CENTER);
@@ -59,7 +109,8 @@ public class EventsPanel extends JPanel {
             JPanel grid = new JPanel(new GridLayout(0, 2, 14, 14));
             grid.setOpaque(false);
             int ci = 0;
-            for (DataStore.Event ev : DataStore.EVENTS) {
+            // FIX: iterate over filteredEvents instead of DataStore.EVENTS
+            for (DataStore.Event ev : filteredEvents) {
                 grid.add(buildCard(ev, ACCENTS[ci % ACCENTS.length]));
                 ci++;
             }
@@ -104,7 +155,7 @@ public class EventsPanel extends JPanel {
                 g2.dispose();
             }
         };
-        band.setPreferredSize(new Dimension(0, 70));
+        band.setPreferredSize(new Dimension(0, 56));
         band.setOpaque(false);
 
         // Date badge
@@ -186,14 +237,31 @@ public class EventsPanel extends JPanel {
                 g2.fillRect(0,0,getWidth(),getHeight()); g2.dispose();
             }
         };
-        band.setPreferredSize(new Dimension(0, 80));
+        // FIX: Increased height from 66 to 90 to prevent title clipping
+        band.setPreferredSize(new Dimension(0, 90));
         band.setLayout(new BorderLayout(0,0));
         band.setBorder(BorderFactory.createEmptyBorder(14, 22, 14, 22));
+        
+        // FIX: Use BoxLayout for proper vertical stacking of chip + title
+        JPanel bandContent = new JPanel();
+        bandContent.setLayout(new BoxLayout(bandContent, BoxLayout.Y_AXIS));
+        bandContent.setOpaque(false);
+        
+        JPanel chipRow2 = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        chipRow2.setOpaque(false);
         JLabel catChip = Theme.chip(" " + ev.category.toUpperCase() + " ", Color.WHITE,
             new Color(255,255,255,50));
+        chipRow2.add(catChip);
+        
         JLabel titleLbl = new JLabel(ev.title);
-        titleLbl.setFont(new Font("SansSerif", Font.BOLD, 21)); titleLbl.setForeground(Color.WHITE);
-        band.add(catChip, BorderLayout.NORTH); band.add(titleLbl, BorderLayout.SOUTH);
+        titleLbl.setFont(new Font("SansSerif", Font.BOLD, 20));
+        titleLbl.setForeground(Color.WHITE);
+        
+        bandContent.add(chipRow2);
+        bandContent.add(Box.createVerticalStrut(6));
+        bandContent.add(titleLbl);
+        band.add(bandContent, BorderLayout.CENTER);
+        
         root.add(band, BorderLayout.NORTH);
 
         JPanel body = new JPanel();
@@ -209,24 +277,25 @@ public class EventsPanel extends JPanel {
 
         JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 10));
         footer.setBackground(Theme.BG_CARD);
-        footer.setBorder(BorderFactory.createMatteBorder(1,0,0,0,Theme.BORDER));
+        footer.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, Theme.BORDER));
         JButton close = Theme.primaryButton("Close");
         close.addActionListener(e -> dlg.dispose());
         footer.add(close);
         root.add(footer, BorderLayout.SOUTH);
 
-        dlg.setContentPane(root); dlg.setVisible(true);
+        dlg.setContentPane(root);
+        dlg.setVisible(true);
     }
 
     private void addDetail(JPanel p, String label, String value) {
         JPanel row = new JPanel(new BorderLayout(10, 0)); row.setOpaque(false);
-        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
         row.setBorder(BorderFactory.createEmptyBorder(0,0,8,0));
         JLabel lbl = new JLabel(label);
         lbl.setFont(Theme.font(Font.BOLD, 15)); lbl.setForeground(Theme.TEXT_MUTE);
         lbl.setPreferredSize(new Dimension(100, 24));
         JLabel val = new JLabel(value);
-        val.setFont(Theme.font(Font.PLAIN, 16)); val.setForeground(Theme.TEXT_DARK);
+        val.setFont(Theme.font(Font.PLAIN, 15)); val.setForeground(Theme.TEXT_DARK);
         row.add(lbl, BorderLayout.WEST); row.add(val, BorderLayout.CENTER);
         row.setAlignmentX(LEFT_ALIGNMENT);
         p.add(row);
@@ -256,7 +325,7 @@ public class EventsPanel extends JPanel {
         header.setBackground(new Color(0x1A1836));
         header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.BORDER));
         JLabel head = new JLabel("New Campus Event");
-        head.setFont(new Font("SansSerif", Font.BOLD, 19)); head.setForeground(Theme.TEXT_DARK);
+        head.setFont(new Font("SansSerif", Font.BOLD, 16)); head.setForeground(Theme.TEXT_DARK);
         header.add(head);
         root.add(header, BorderLayout.NORTH);
 
@@ -275,7 +344,7 @@ public class EventsPanel extends JPanel {
         String[] cats = {"Seminar","Workshop","Cultural","Sports","Academic","Health","Other"};
         JComboBox<String> catBox = new JComboBox<>(cats);
         catBox.setBackground(Theme.BG_INPUT); catBox.setForeground(Theme.TEXT_DARK);
-        catBox.setFont(Theme.font(Font.PLAIN, 16));
+        catBox.setFont(Theme.font(Font.PLAIN, 19));
 
         String[] labels = {"Title","Date","Time","Category","Location"};
         JComponent[] comps = {titleF, dateF, timeF, catBox, locF};
@@ -301,12 +370,26 @@ public class EventsPanel extends JPanel {
         cancel.addActionListener(e -> dlg.dispose());
         JButton save = Theme.primaryButton("Add Event");
         save.setPreferredSize(new Dimension(120, 34));
+        // Department selector
+        JComboBox<String> evDeptBox = new JComboBox<>(DEPTS);
+        evDeptBox.setBackground(Theme.BG_INPUT); evDeptBox.setForeground(Theme.TEXT_DARK);
+        evDeptBox.setFont(Theme.font(Font.PLAIN, 19));
+        JLabel deptLbl = new JLabel("Department");
+        deptLbl.setForeground(Theme.TEXT_MUTE); deptLbl.setFont(Theme.FONT_SMALL);
+        gc.gridy = labels.length*2; gc.insets = new Insets(8,0,4,0); form.add(deptLbl,gc);
+        gc.gridy = labels.length*2+1; gc.insets = new Insets(0,0,0,0); form.add(evDeptBox,gc);
+
         save.addActionListener(e -> {
             if (titleF.getText().trim().isEmpty()) { JOptionPane.showMessageDialog(dlg,"Title required"); return; }
             if (dateF.getText().trim().isEmpty()) { JOptionPane.showMessageDialog(dlg,"Date required (YYYY-MM-DD)"); return; }
-            DAO.addEvent(titleF.getText().trim(), dateF.getText().trim(),
+            String evDept = (String) evDeptBox.getSelectedItem();
+            int evId = DAO.addEvent(titleF.getText().trim(), dateF.getText().trim(),
                 timeF.getText().trim(), (String) catBox.getSelectedItem(),
-                locF.getText().trim(), user.id);
+                locF.getText().trim(), user.id, evDept);
+            DAO.pushNotificationToAll(evDept, "event",
+                "📅 New Event: " + titleF.getText().trim(),
+                dateF.getText().trim() + " at " + timeF.getText().trim() + " — " + locF.getText().trim(),
+                evId, user.id);
             DataStore.reloadEvents(); rebuild(); dlg.dispose();
         });
         btnRow.add(cancel); btnRow.add(save);
