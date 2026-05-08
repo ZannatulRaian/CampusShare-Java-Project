@@ -59,7 +59,7 @@ Featured top announcement with full-text popup.
 ## 📸 Screenshots
 
 ### 🔐 Login
-![Login](docs/screenshots/loginn.png)
+![Login](docs/screenshots/login.png)
 
 ### 🏠 Dashboard
 ![Dashboard](docs/screenshots/dashboard.png)
